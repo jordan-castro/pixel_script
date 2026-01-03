@@ -75,16 +75,18 @@ pub enum VarType {
     Bool,
     Float32,
     Float64,
-    // Lua (nil), Python (None), JS/easyjs (null)
+    /// Lua (nil), Python (None), JS/easyjs (null)
     Null,
+    /// Lua (Tree), Python (Class), JS/easyjs (Prototype)
+    Object,
+    /// Host object converted when created.
+    /// Lua (Tree), Python (object), JS/easyjs (Prototype think '{}')
+    HostObject, 
     // Array,
-    // // Python only
-    // Dict,
-    // // Lua only
-    // Tree,
-    // // JS/Python only
-    // Object
 }
+
+/// Method type for Freeing the ObjectOwned in the Pixel runtime.
+pub type FreeMethod = unsafe extern "C" fn(val: *mut c_void);
 
 /// The Variables actual value union.
 #[repr(C)]
@@ -98,9 +100,36 @@ pub union VarValue {
     pub f32_val: f32,
     pub f64_val: f64,
     pub null_val: *const c_void,
+    pub object_val: *mut c_void,
 }
 
-/// The Variable struct that can be accessed directly from C.
+/// A PixelScript Var(iable).
+///
+/// This is the universal truth between all languages PixelScript supports.
+///
+/// Currently supports:
+/// - int (i32, i64, u32, u64)
+/// - float (f32, f64)
+/// - string
+/// - boolean
+/// - Objects (these are a more of a pseudo-type)
+///
+/// When working with objects you must use the C-api:
+/// ```c
+/// // Calls a method on a object.
+/// pixelscript_object_call()
+/// // Gets a value from a object (key -> value pair).
+/// pixelscript_object_get()
+/// // Sets a value on a object (key -> value pair)
+/// pixelscript_object_set()
+/// ```
+/// 
+/// When using within a callback, if said callback was attached to a Class, the first *mut Var will be the class/object.
+///
+/// When using ints or floats, if (i32, u32, u64, f32) there is no gurantee that the supported language uses
+/// those types. Usually it defaults to i64 and f64.
+/// 
+/// When creating a object, this is a bit tricky but essentially you have to first create a pointer via the pixel script runtime.
 #[repr(C)]
 pub struct Var {
     /// A tag for the variable type.
@@ -163,6 +192,16 @@ impl Var {
         }
     }
 
+    /// Create a new HostObject var.
+    pub fn new_host_object(ptr: *const c_void) -> Self {
+        Var {
+            tag: VarType::HostObject,
+            value: VarValue { 
+                object_val: ptr 
+            },
+        }
+    }
+
     /// Convert a Vec<Var> into **Var (*const *mut Var)
     ///
     /// !Important This will leak memory which MUST BE FREED.
@@ -203,6 +242,9 @@ impl Var {
         }
     }
 
+    /// Do object.call
+    pub fn call_method<P: ObjectMethods>(&self, provider: &P, ) {}
+
     write_func!(
         (get_i32, i32_val, i32, VarType::Int32),
         (get_u32, u32_val, u32, VarType::UInt32),
@@ -231,7 +273,7 @@ impl Var {
         is_u64, VarType::UInt64;
         is_f32, VarType::Float32;
         is_f64, VarType::Float64;
-        is_bool, VarType::Float64;
+        is_bool, VarType::Bool;
         is_string, VarType::String;
         is_null, VarType::Null
     }
@@ -285,7 +327,28 @@ impl Clone for Var {
                 VarType::Float32 => Var::new_f32(self.value.f32_val),
                 VarType::Float64 => Var::new_f64(self.value.f64_val),
                 VarType::Null => Var::new_null(),
+                VarType::Object => Var {
+                    tag: VarType::Object,
+                    value: VarValue {
+                        object_val: self.value.object_val,
+                    },
+                },
+                VarType::HostObject => Var {
+                    tag: VarType::HostObject,
+                    value: VarValue {
+                        object_val: self.value.object_val
+                    }
+                }
             }
         }
     }
+}
+
+pub trait ObjectMethods {
+    /// Call a method on a object.
+    fn object_call(&self, var: &Var, method: &str, args: Vec<Var>) -> Result<Var, Error>;
+    /// Get a value from a object.
+    fn object_get(&self, var: &Var, key: &str) -> Result<Var, Error>;
+    /// Set a value on a object.
+    fn object_set(&self, var: &Var, key: &str, value: &Var);
 }

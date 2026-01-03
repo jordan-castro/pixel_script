@@ -71,11 +71,16 @@ impl Module {
     }
 
     /// Add a variable to current module.
-    pub fn add_variable(&mut self, name: &str, var: Var) {
+    pub fn add_variable(&mut self, name: &str, var: &Var) {
         self.variables.push(ModuleVariable {
             name: name.to_string(),
-            var,
+            var: var.clone(),
         });
+    }
+
+    /// Add a internal module.
+    pub fn add_module(&mut self, child: Module) {
+        self.modules.push(child);
     }
 }
 

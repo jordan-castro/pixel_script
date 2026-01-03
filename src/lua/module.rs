@@ -6,6 +6,50 @@ use crate::{
 };
 use mlua::prelude::*;
 
+/// Create the module table.
+fn create_module(context: &Lua, module: &Module) -> LuaTable {
+    let module_table = context.create_table().expect("Could not create LUA table.");
+
+    // Add variables
+    for variable in module.variables.iter() {
+        module_table
+            .set(
+                variable.name.to_owned(),
+                variable
+                    .var
+                    .clone()
+                    .into_lua(context)
+                    .expect("Could not convert variable to Lua."),
+            )
+            .expect("Could not set variable to module.");
+    }
+
+    // Add callbacks
+    for callback in module.callbacks.iter() {
+        // Get internals
+        let func = callback.func.func;
+        let opaque = callback.func.opaque;
+
+        // Create lua function
+        let lua_function = internal_add_callback(context, func, opaque);
+        module_table
+            .set(callback.name.as_str(), lua_function)
+            .expect("Could not set callback to module");
+    }
+
+    // Add internal modules
+    for inner_module in module.modules.iter() {
+        // Create a module
+        let inner_table = create_module(context, inner_module);
+        // Add to this module
+        module_table
+            .set(inner_module.name.to_owned(), inner_table)
+            .expect("Could not create inner module.");
+    }
+
+    module_table
+}
+
 /// Add a module to Lua!
 pub fn add_module(module: Arc<Module>) {
     // First get lua state
@@ -28,35 +72,7 @@ pub fn add_module(module: Arc<Module>) {
     let loader = state
         .engine
         .create_function(move |lua, _: ()| {
-            let module_table = lua.create_table()?;
-
-            // Add variables
-            for variable in module_for_lua.variables.iter() {
-                module_table
-                    .set(
-                        variable.name.to_owned(),
-                        variable
-                            .var
-                            .clone()
-                            .into_lua(lua)
-                            .expect("Could not convert variable to Lua."),
-                    )
-                    .expect("Could not set variable to module.");
-            }
-
-            // Add callbacks
-            for callback in module_for_lua.callbacks.iter() {
-                // Get internals
-                let func = callback.func.func;
-                let opaque = callback.func.opaque;
-
-                // Create lua function
-                let lua_function = internal_add_callback(lua, func, opaque);
-                module_table
-                    .set(callback.name.as_str(), lua_function)
-                    .expect("Could not set callback to module");
-            } 
-
+            let module_table = create_module(lua, &module_for_lua);
             // Return module
             Ok(module_table)
         })

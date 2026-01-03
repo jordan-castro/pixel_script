@@ -4,6 +4,7 @@ pub mod var;
 pub mod func;
 pub mod class;
 pub mod module;
+pub mod object;
 
 /// A shared trait for converting from/to a pointer. Specifically a (* mut Self)
 pub trait PtrMagic: Sized {
@@ -32,11 +33,13 @@ pub trait PtrMagic: Sized {
 /// The trait to use for PixelScrpipting
 pub trait PixelScript {
     /// Add a global variable to the runtime.
-    fn add_variable(name: &str, variable: var::Var);
+    fn add_variable(name: &str, variable: &var::Var);
     /// Add a global callback to the runtime.
     fn add_callback(name: &str, callback: func::Func, opaque: *mut c_void);
     /// Add a global module to the runtime.
     fn add_module(source: Arc<module::Module>);
     /// Add a global class to the runtime.
-    fn add_class(source: Arc<class::Class>);
+    fn add_class(source: Arc<class::PixelClass>);
+    /// Execute a script in this runtime.
+    fn execute(code: &str, file_name: &str) -> String;
 }

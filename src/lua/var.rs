@@ -1,8 +1,8 @@
-use mlua::{IntoLua, Lua};
+// use mlua::{IntoLua, Lua};
+use mlua::prelude::*;
 
 // Pure Rust goes here
 use crate::{
-    lua::get_state,
     shared::var::{Var, VarType},
 };
 
@@ -24,6 +24,21 @@ impl IntoLua for Var {
             VarType::Float32 => Ok(mlua::Value::Number(self.get_f32().unwrap() as f64)),
             VarType::Float64 => Ok(mlua::Value::Number(self.get_f64().unwrap())),
             VarType::Null => Ok(mlua::Value::Nil),
+            VarType::Object => {
+                unsafe {
+                    // This MUST BE A TABLE!
+                    let table_ptr = self.value.object_val as *const LuaTable;
+                    if table_ptr.is_null() {
+                        return Err(mlua::Error::RuntimeError("Null pointer in Object".to_string()));
+                    }
+
+                    // Clone 
+                    let lua_table = (&*table_ptr).clone();
+
+                    // WooHoo we are back into lua
+                    Ok(mlua::Value::Table(lua_table))
+                }
+            }
         }
     }
 }

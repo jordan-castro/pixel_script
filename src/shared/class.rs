@@ -1,4 +1,6 @@
-use crate::shared::{PtrMagic, module::{ModuleCallback, ModuleVariable}};
+use std::ffi::c_void;
+
+use crate::shared::{PtrMagic, func::{Func, Function}, module::{ModuleCallback, ModuleVariable}, var::Var};
 
 /// A Class in the PixelScript runtime.
 /// 
@@ -24,7 +26,7 @@ use crate::shared::{PtrMagic, module::{ModuleCallback, ModuleVariable}};
 /// Choose a module if it is optional. And combine the both as you please.
 /// 
 /// Although main difference between a class and a module is that a class is ideally created using raw literals and then executed.
-pub struct Class {
+pub struct PixelClass {
     /// The name of the class.
     pub name: String,
     /// Callbacks inside the class
@@ -33,7 +35,33 @@ pub struct Class {
     pub vars: Vec<ModuleVariable>,
 }
 
-impl PtrMagic for Class {}
+impl PixelClass {
+    pub fn new(name:String) -> Self {
+        PixelClass {
+            name,
+            callbacks: vec![],
+            vars: vec![]
+        }
+    }
 
-unsafe impl Send for Class {}
-unsafe impl Sync for Class {}
+    /// Add a callback to current class.
+    pub fn add_callback(&mut self, name: &str, func: Func, opaque: *mut c_void) {
+        self.callbacks.push(ModuleCallback {
+            name: name.to_string(),
+            func: Function { func, opaque },
+        });
+    }
+
+    /// Add a variable to current class.
+    pub fn add_variable(&mut self, name: &str, var: &Var) {
+        self.vars.push(ModuleVariable {
+            name: name.to_string(),
+            var: var.clone(),
+        });
+    }
+}
+
+impl PtrMagic for PixelClass {}
+
+unsafe impl Send for PixelClass {}
+unsafe impl Sync for PixelClass {}

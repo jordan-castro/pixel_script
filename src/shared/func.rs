@@ -8,13 +8,15 @@ use std::{collections::HashMap, ffi::c_void, sync::{Mutex, OnceLock}};
 /// opaque: *mut c_void, opaque user data. 
 /// 
 /// Func handles it's own memory, so no need to free the *mut Var returned or the argvs.
+/// 
+/// But if you use any Vars within the function, you will have to free them before the function returns.
 pub type Func = unsafe extern "C" fn(
     argc: usize, 
     argv: *mut *mut Var, 
     opaque: *mut c_void
 ) -> *mut Var;
 
-/// The Function structure used in Rust!
+/// Basic rust structure to track Funcs and opaques together.
 pub struct Function {
     pub func: Func,
     pub opaque: *mut c_void
@@ -47,7 +49,7 @@ impl FunctionLookup {
 static FUNCTION_LOOKUP: OnceLock<Mutex<FunctionLookup>> = OnceLock::new();
 
 /// Get the function lookup global state. Shared between all runtimes.
-pub fn get_function_lookup() -> std::sync::MutexGuard<'static, FunctionLookup> {
+pub(crate) fn get_function_lookup() -> std::sync::MutexGuard<'static, FunctionLookup> {
     FUNCTION_LOOKUP.get_or_init(|| {
         Mutex::new(FunctionLookup {
             function_hash: HashMap::new(),

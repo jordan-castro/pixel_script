@@ -2,7 +2,7 @@
 mod tests {
     use std::{ffi::c_void, ptr, sync::Arc};
 
-    use pixel_script::{shared::{PtrMagic, var::Var}, *};
+    use pixel_script::{lua::LuaScripting, shared::{PixelScript, PtrMagic, var::Var}, *};
 
     // Testing callbacks
     pub extern "C" fn print_wrapper(
@@ -13,11 +13,9 @@ mod tests {
         unsafe {
             let args = std::slice::from_raw_parts(argv, argc);
 
-            let var_ptr = args[0];
+            let var_ptr = Var::from_borrow(args[0]);
 
-            let var_ref = &*var_ptr;
-
-            if let Ok(msg) = var_ref.get_string() {
+            if let Ok(msg) = var_ptr.get_string() {
                 println!("Lua sent: {}", msg);
             }
         }
@@ -41,24 +39,45 @@ mod tests {
         }
     }
 
+    // pub extern "C" fn greet_wrapper(
+    //     argc: usize,
+    //     argv: *mut *mut Var,
+    //     opaque: *mut c_void
+    // ) -> *mut Var {
+    //     unsafe {
+    //     obj = argc[0].obj
+    //     obj.call('test')
+    //     return Var::new_object()
+    //     }
+    // }
+
     #[test]
     fn test_add_variable() {
-        lua::var::add_variable("name", Var::new_string(String::from("Jordan")));
+        LuaScripting::add_variable("name", &Var::new_string(String::from("Jordan")));
+        // lua::var::add_variable("name", Var::new_string(String::from("Jordan")));
     }
 
     #[test]
     fn test_add_callback() {
-        lua::func::add_callback("println", print_wrapper, ptr::null_mut());
+        LuaScripting::add_callback("println", print_wrapper, ptr::null_mut());
     }
 
     #[test]
     fn test_add_module() {
         let mut module = shared::module::Module::new("cmath".to_string());
         module.add_callback("add", add_wrapper, ptr::null_mut());
-        module.add_variable("n1", Var::new_i64(1));
-        module.add_variable("n2", Var::new_i64(2));
+        module.add_variable("n1", &Var::new_i64(1));
+        module.add_variable("n2", &Var::new_i64(2));
 
-        lua::module::add_module(Arc::new(module));
+        LuaScripting::add_module(Arc::new(module));
+    }
+
+    #[test]
+    fn test_add_class() {
+        let mut class = shared::class::PixelClass::new("Person".to_string());
+        class.add_variable("name", &Var::new_string("Jordan".to_owned()));
+        class.add_variable("age", &Var::new_i64(23));
+        // class.add_callback("greet", func, opaque);
     }
 
     #[test]
@@ -80,7 +99,7 @@ mod tests {
             end
             println("Yessir!")
         "#;
-        let err = lua::execute(lua_code, "<test>");
+        let err = LuaScripting::execute(lua_code, "<test>");
 
         assert!(err.is_empty(), "Error is not empty: {}", err);
     }

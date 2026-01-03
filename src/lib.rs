@@ -1,10 +1,10 @@
-use std::{ffi::{CStr, CString, c_char, c_void}, ptr};
+use std::{ffi::{CStr, CString, c_char, c_void}, ptr, sync::{Arc, Mutex, MutexGuard, OnceLock}};
 use shared::{
     var::Var,
     func::Func
 };
 
-use crate::shared::{PtrMagic, module::Module};
+use crate::{lua::LuaScripting, shared::{PixelScript, PtrMagic, module::Module}};
 
 pub mod shared;
 pub mod lua;
@@ -47,6 +47,19 @@ macro_rules! create_raw_string {
     }};
 }
 
+// // Static for LuaScripting
+// /// The State static variable for Lua.
+// static LUA_STATE: OnceLock<Mutex<LuaScripting>> = OnceLock::new();
+// /// Get the state of LUA.
+// fn lua_get_state() -> MutexGuard<'static, LuaScripting> {
+//     let mutex = LUA_STATE.get_or_init(|| {
+//         Mutex::new(LuaScripting {})
+//     });
+    
+//     // This will block the C thread if another thread is currently using Lua
+//     mutex.lock().expect("Failed to lock Lua State")
+// }
+
 /// Current pixelscript version.
 #[unsafe(no_mangle)]
 pub extern "C" fn pixelscript_version() -> u32 {
@@ -64,7 +77,7 @@ pub extern "C" fn pixelscript_add_variable(name: *const c_char, variable: Var) {
     }
 
     // Add variable to lua context
-    lua::var::add_variable(r_str, variable);
+    LuaScripting::add_variable(r_str, variable);
 }
 
 /// Add a callback to the __main__ context.
@@ -78,7 +91,7 @@ pub extern "C" fn pixelscript_add_callback(name: *const c_char, func: Func, opaq
     }
 
     // Add Function to lua context
-    
+    LuaScripting::add_callback(name_str, func, opaque);
 }
 
 /// Execute some lua code. Will return a String, an empty string means that the 
@@ -175,10 +188,11 @@ pub extern "C" fn pixelscript_add_module(module_ptr: *mut Module) {
         return;
     }
 
-    let module = Module::from_raw(module_ptr);
+    let module = Arc::new(Module::from_raw(module_ptr));
 
     // LUA
-    lua::module::add_module(module);
+    LuaScripting::add_module(Arc::clone(&module));
+    // lua::module::add_module(Arc::clone(&module));
 
     // Module gets dropped here, and that is good!
 }

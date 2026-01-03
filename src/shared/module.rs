@@ -35,6 +35,8 @@ pub struct Module {
     pub callbacks: Vec<ModuleCallback>,
     /// Variables that need to be added.
     pub variables: Vec<ModuleVariable>,
+    /// Internal modules
+    pub modules: Vec<Module>
 }
 
 /// Wraps a Func with a name.
@@ -56,6 +58,7 @@ impl Module {
             name: name,
             callbacks: vec![],
             variables: vec![],
+            modules: vec![]
         }
     }
 

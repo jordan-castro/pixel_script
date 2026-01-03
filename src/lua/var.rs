@@ -1,4 +1,4 @@
-use mlua::{IntoLua, Value::Nil};
+use mlua::{IntoLua, Lua};
 
 // Pure Rust goes here
 use crate::{
@@ -29,98 +29,15 @@ impl IntoLua for Var {
 }
 
 /// Add a variable by name to __main__ in lua.
-pub fn add_variable(name: &str, variable: Var) {
-    let state = get_state();
-
-    match variable.tag {
-        crate::shared::var::VarType::Int32 => {
-            state
-                .engine
-                .globals()
-                .set(
-                    name,
-                    variable.get_i32().expect("Could not unwrap i32 from Var."),
-                )
-                .expect("Could not set variable.");
-        }
-        crate::shared::var::VarType::Int64 => {
-            state
-                .engine
-                .globals()
-                .set(
-                    name,
-                    variable.get_i64().expect("Could not unwrap i64 from Var."),
-                )
-                .expect("Could not set variable.");
-        }
-        crate::shared::var::VarType::UInt32 => {
-            state
-                .engine
-                .globals()
-                .set(
-                    name,
-                    variable.get_u32().expect("Could not unwrap u32 from Var."),
-                )
-                .expect("Could not set variable.");
-        }
-        crate::shared::var::VarType::UInt64 => {
-            state
-                .engine
-                .globals()
-                .set(
-                    name,
-                    variable.get_u64().expect("Could not unwrap u64 from Var."),
-                )
-                .expect("Could not set variable.");
-        }
-        crate::shared::var::VarType::String => {
-            state
-                .engine
-                .globals()
-                .set(
-                    name,
-                    variable
-                        .get_string()
-                        .expect("Could not unwrap String from Var"),
-                )
-                .expect("Could not set variable.");
-        }
-        crate::shared::var::VarType::Bool => {
-            state
-                .engine
-                .globals()
-                .set(
-                    name,
-                    variable
-                        .get_bool()
-                        .expect("Could not unwrap bool from Var."),
-                )
-                .expect("Could not set varible.");
-        }
-        crate::shared::var::VarType::Float32 => {
-            state
-                .engine
-                .globals()
-                .set(
-                    name,
-                    variable.get_f32().expect("Could not unwrap f32 from Var."),
-                )
-                .expect("Could not set variable.");
-        }
-        crate::shared::var::VarType::Float64 => {
-            state
-                .engine
-                .globals()
-                .set(
-                    name,
-                    variable.get_f64().expect("Could not unwrap f64 from Var."),
-                )
-                .expect("Could not set variable.");
-        }
-        crate::shared::var::VarType::Null => {
-            state.engine.globals().set(name, Nil).expect("Could not set variable.");
-        }
-    }
-
+pub fn add_variable(context: &Lua, name: &str, variable: Var) {
+    context
+        .globals()
+        .set(
+            name,
+            variable
+                .into_lua(context)
+                .expect("Could not unwrap LUA vl from Var."),
+        )
+        .expect("Could not add variable to Lua global context.");
     // Listo!
 }

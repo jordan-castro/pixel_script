@@ -1,6 +1,6 @@
 #[cfg(test)]
 mod tests {
-    use std::{ffi::c_void, ptr};
+    use std::{ffi::c_void, ptr, sync::Arc};
 
     use pixel_script::{shared::{PtrMagic, var::Var}, *};
 
@@ -58,7 +58,7 @@ mod tests {
         module.add_variable("n1", Var::new_i64(1));
         module.add_variable("n2", Var::new_i64(2));
 
-        lua::module::add_module(module);
+        lua::module::add_module(Arc::new(module));
     }
 
     #[test]

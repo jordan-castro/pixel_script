@@ -1,9 +1,12 @@
 pub mod var;
 pub mod func;
 pub mod module;
+pub mod class;
 
-use std::{sync::{Mutex, OnceLock}};
+use std::sync::{Arc, Mutex, OnceLock};
 use mlua::prelude::*;
+
+use crate::shared::{PixelScript, class::Class};
 
 /// This is the Lua state. Each language gets it's own private state
 struct State {
@@ -37,4 +40,27 @@ pub fn execute(code: &str, file_name: &str) -> String {
     }
 
     String::from("")
+}
+
+pub struct LuaScripting {}
+
+impl PixelScript for LuaScripting {
+    fn add_variable(name: &str, variable: crate::shared::var::Var) {
+        var::add_variable(&get_state().engine, name, variable);
+    }
+
+    fn add_callback(name: &str, callback: crate::shared::func::Func, opaque: *mut std::ffi::c_void) {
+        func::add_callback(name, callback, opaque);
+    }
+
+    fn add_module(source: std::sync::Arc<crate::shared::module::Module>) {
+        module::add_module(source);
+    }
+
+    fn add_class(source: std::sync::Arc<Class>) {
+        let state = get_state();
+        let table = class::create_class(&state.engine, Arc::clone(&source));
+
+        state.engine.globals().set(source.name.to_owned(), table).expect("Could not add Table to globals LUA");
+    }
 }

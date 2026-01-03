@@ -7,9 +7,12 @@ use crate::{
 use mlua::prelude::*;
 
 /// Add a module to Lua!
-pub fn add_module(module: &Module) {
+pub fn add_module(module: Arc<Module>) {
     // First get lua state
     let state = get_state();
+
+    let mod_name = module.name.clone();
+    let module_for_lua = Arc::clone(&module);
 
     // Let's create a table
     let package: LuaTable = state
@@ -28,7 +31,7 @@ pub fn add_module(module: &Module) {
             let module_table = lua.create_table()?;
 
             // Add variables
-            for variable in module.variables.iter() {
+            for variable in module_for_lua.variables.iter() {
                 module_table
                     .set(
                         variable.name.to_owned(),
@@ -42,7 +45,7 @@ pub fn add_module(module: &Module) {
             }
 
             // Add callbacks
-            for callback in module.callbacks.iter() {
+            for callback in module_for_lua.callbacks.iter() {
                 // Get internals
                 let func = callback.func.func;
                 let opaque = callback.func.opaque;
@@ -52,7 +55,7 @@ pub fn add_module(module: &Module) {
                 module_table
                     .set(callback.name.as_str(), lua_function)
                     .expect("Could not set callback to module");
-            }
+            } 
 
             // Return module
             Ok(module_table)
@@ -61,6 +64,6 @@ pub fn add_module(module: &Module) {
 
     // Pre-load it
     preload
-        .set(module.name, loader)
+        .set(mod_name, loader)
         .expect("Could not set Lua module loader.");
 }

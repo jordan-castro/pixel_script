@@ -44,6 +44,8 @@ pub trait PixelScript {
     fn add_callback(name: &str, callback: func::Func, opaque: *mut c_void);
     /// Add a global module to the runtime.
     fn add_module(source: Arc<module::Module>);
+    /// add obj
+    fn add_object(source: Arc<object::PixelObject>) -> i32;
     /// Execute a script in this runtime.
     fn execute(code: &str, file_name: &str) -> String;
 }

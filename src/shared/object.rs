@@ -59,9 +59,7 @@ pub type FreeMethod = unsafe extern "C" fn(ptr: *mut c_void);
 /// }
 ///
 /// // OOP base
-/// PixelClass* person_class = pixelscript_new_class("Person");
-/// pixelscript_class_add_object(person_class, new_person);
-/// pixelscript_add_class(person_class);
+/// pixelscript_add_object("Person", new_person);
 ///
 /// // Or functional
 /// pixelscript_add_callback("new_person", new_person);
@@ -73,8 +71,7 @@ pub type FreeMethod = unsafe extern "C" fn(ptr: *mut c_void);
 /// p.set_name("James"); 
 /// ```
 ///
-/// So first you add a Class with a constructor. Then within the constructor you return the object.
-/// This is why a Class/Object are more like Pseudo types than actual class/objects.
+/// This is why a Objects are more like Pseudo types than actual class/objects.
 pub struct PixelObject {
     /// The Host pointer
     pub ptr: *mut c_void,

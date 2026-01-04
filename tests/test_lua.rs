@@ -2,7 +2,7 @@
 mod tests {
     use std::{ffi::c_void, ptr, sync::Arc};
 
-    use pixel_script::{lua::LuaScripting, shared::{PixelScript, PtrMagic, var::Var}, *};
+    use pixel_script::{lua::LuaScripting, shared::{PixelScript, PtrMagic, object::PixelObject, var::Var}, *};
 
     struct Person {
         name: String
@@ -24,12 +24,57 @@ mod tests {
         }
     }
 
-    pub extern "C" fn free_person(ptr: *mut c_void) {}
+    impl PtrMagic for Person {}
+
+    pub extern "C" fn free_person(ptr: *mut c_void) {
+        let _ = unsafe { Person::from_borrow(ptr as *mut Person) };
+    }
+
+    pub extern "C" fn set_name(argc: usize, argv: *mut *mut Var, opaque: *mut c_void) -> *mut Var {
+        unsafe {
+            let args = Var::slice_raw(argv, argc);
+            // Get ptr
+            let pixel_object_var = Var::from_borrow(args[0]);
+            let host_ptr = pixel_object_var.get_host_ptr();
+            let p = Person::from_borrow(host_ptr as *mut Person);
+
+            let name = Var::from_borrow(args[1]);
+            p.set_name(name.get_string().unwrap().clone());
+
+            Var::into_raw(Var::new_null())
+        }
+    }
+
+    pub extern "C" fn get_name(argc: usize, argv: *mut *mut Var, opaque: *mut c_void) -> *mut Var {
+        unsafe {
+            let args = Var::slice_raw(argv, argc);
+            // Get ptr
+            let pixel_object_var = Var::from_borrow(args[0]);
+            let host_ptr = pixel_object_var.get_host_ptr();
+            let p = Person::from_borrow(host_ptr as *mut Person);
+
+            Var::new_string(p.get_name().clone()).into_raw()
+        }
+    }
 
     pub extern "C" fn new_person(argc: usize, argv: *mut *mut Var, opaque: *mut c_void) -> *mut Var {
         unsafe {
-            // let p = Person::new();
-            pixelscript_new_object(ptr, free_person)
+            let args = std::slice::from_raw_parts(argv, argc);
+            let p_name = Var::from_borrow(args[0]);
+            let p_name = p_name.get_string().unwrap();
+            let p = Person::new(p_name.clone());
+
+            let ptr = Person::into_raw(p) as *mut c_void;
+            let mut pixel_object = PixelObject::new(ptr, free_person);
+            pixel_object.add_callback("set_name", set_name, opaque);
+            pixel_object.add_callback("get_name", get_name, opaque);
+
+            let pixel_arc = Arc::new(pixel_object);
+
+            // Save...
+            let idx = LuaScripting::add_object(Arc::clone(&pixel_arc));
+
+            Var::into_raw(Var::new_host_object(idx))
         }
     }
 
@@ -68,18 +113,6 @@ mod tests {
         }
     }
 
-    // pub extern "C" fn greet_wrapper(
-    //     argc: usize,
-    //     argv: *mut *mut Var,
-    //     opaque: *mut c_void
-    // ) -> *mut Var {
-    //     unsafe {
-    //     obj = argc[0].obj
-    //     obj.call('test')
-    //     return Var::new_object()
-    //     }
-    // }
-
     #[test]
     fn test_add_variable() {
         LuaScripting::add_variable("name", &Var::new_string(String::from("Jordan")));
@@ -102,11 +135,8 @@ mod tests {
     }
 
     #[test]
-    fn test_add_class() {
-        let mut class = shared::class::PixelClass::new("Person".to_string());
-        class.add_variable("name", &Var::new_string("Jordan".to_owned()));
-        class.add_variable("age", &Var::new_i64(23));
-        // class.add_callback("greet", func, opaque);
+    fn test_add_object() {
+        LuaScripting::add_callback("Person", new_person, ptr::null_mut());
     }
 
     #[test]
@@ -114,6 +144,7 @@ mod tests {
         test_add_variable();
         test_add_callback();
         test_add_module();
+        test_add_object();
         let lua_code = r#"
             local msg = "Welcome, " .. name
             println(msg)
@@ -126,7 +157,11 @@ mod tests {
             if result ~= 3 then
                 error("Math, Expected 3, got " .. tostring(result))
             end
-            println("Yessir!")
+
+            local person = Person("Jordan")
+            println(person.get_name())
+            person.set_name("Jordan Castro")
+            println(person.get_name())
         "#;
         let err = LuaScripting::execute(lua_code, "<test>");
 

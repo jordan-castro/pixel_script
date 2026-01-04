@@ -85,6 +85,12 @@ impl PixelScript for LuaScripting {
         state.engine.gc_collect().unwrap();
         state.engine.gc_collect().unwrap();
     }
+    
+    fn add_object(source: Arc<PixelObject>) -> i32 {
+        let mut object_lookup = get_object_lookup();
+        let idx = object_lookup.add_object(Arc::clone(&source));
+        idx
+    }
 }
 
 impl ObjectMethods for LuaScripting {

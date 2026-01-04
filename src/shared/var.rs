@@ -5,7 +5,7 @@ use std::{
 
 use anyhow::{Error, anyhow};
 
-use crate::shared::PtrMagic;
+use crate::shared::{PtrMagic, object::get_object_lookup};
 
 /// Macro for writing out the Var:: get methods.
 macro_rules! write_func {
@@ -18,7 +18,7 @@ macro_rules! write_func {
                         Ok(self.value.$field_name)
                     }
                 } else {
-                    Err(anyhow!("Var is not the expected type of {:#?}", $tag_variant))
+                    Err(anyhow!("Var is not the expected type of {:#?}. It is instead a: {:#?}", $tag_variant, self.tag))
                 }
             }
         )*
@@ -138,6 +138,17 @@ pub struct Var {
 
 // Rust specific functions
 impl Var {
+    pub unsafe fn slice_raw(argv: *mut *mut Self, argc: usize) -> &'static [*mut Var] {
+        unsafe {std::slice::from_raw_parts(argv, argc)}
+    }
+
+    pub fn get_host_ptr(&self) -> *mut c_void {
+        // TODO: type checks
+        let object_lookup = get_object_lookup();
+        let object = object_lookup.get_object(self.get_object_ptr()).unwrap();
+        object.ptr
+    }
+
     pub fn get<T: FromVar>(&self) -> Result<T, Error> {
         T::from_var(self)
     }
@@ -253,10 +264,10 @@ impl Var {
     /// Get the ptr of the object if Host, i32, i64, u32, u64
     pub fn get_object_ptr(&self) -> i32 {
         match self.tag {
-            VarType::Int32 => self.get().unwrap(),
-            VarType::Int64 => self.get().unwrap(),
-            VarType::UInt32 => self.get().unwrap(),
-            VarType::UInt64 => self.get().unwrap(),
+            VarType::Int32 => self.get_i32().unwrap(),
+            VarType::Int64 => self.get_i64().unwrap() as i32,
+            VarType::UInt32 => self.get_u32().unwrap() as i32,
+            VarType::UInt64 => self.get_u64().unwrap() as i32,
             VarType::HostObject => unsafe {
                 self.value.host_object_val
             },

@@ -10,7 +10,19 @@
 - module level execution with: module_execute.
 
 - Make better use of anyhow
-- TOMORROW: For objects, instead of passing in a Poiter when calling _new. Pass in a constructor() which returns a *void.
+
+## Functions
+- Use a Vector for lookup.
+
+## Modules
+
+## Objects
+- Use a Vector for lookup.
+- Add a method to add a object to global. Tree in Lua, Class in Python/JS/easyjs
+
+## Vars
+- Expose methods to C
+- pixelscript_var_ methods
 
 ## Lua
 - module_execute

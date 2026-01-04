@@ -37,15 +37,34 @@ pub trait PixelScript {
     /// Add a global variable to the runtime.
     fn add_variable(name: &str, variable: &var::Var);
     /// Add a object variable to the runtime.
-    fn add_object_variable(name: &str, source: Arc<object::PixelObject>);
+    fn add_object_variable(name: &str, idx: i32);
     /// Add a global callback to the runtime.
     fn add_callback(name: &str, callback: func::Func, opaque: *mut c_void);
     /// Add a global module to the runtime.
     fn add_module(source: Arc<module::Module>);
     /// Add a Object constructor globally to the runtime.
     fn add_object(name: &str, callback: func::Func, opaque: *mut c_void);
-    /// Save a Host-Object to the PixelScript runtime.
-    fn save_object(source: Arc<object::PixelObject>) -> i32;
     /// Execute a script in this runtime.
     fn execute(code: &str, file_name: &str) -> String;
+}
+
+/// Public enum for supported runtimes.
+#[repr(C)]
+pub enum PixelScriptRuntime {
+    Lua,
+    Python,
+    JavaScript,
+    Easyjs
+}
+
+impl PixelScriptRuntime {
+    pub fn from_i32(val: i32) -> Option<Self> {
+        match val {
+            0 => Some(Self::Lua),
+            1 => Some(Self::Python),
+            2 => Some(Self::JavaScript),
+            3 => Some(Self::Easyjs),
+            _ => None, // Handle invalid integers from C safely
+        }
+    }
 }

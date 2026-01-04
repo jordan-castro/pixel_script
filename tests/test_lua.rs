@@ -40,7 +40,16 @@ mod tests {
             let host_ptr = pixel_object_var.get_host_ptr();
             let p = Person::from_borrow(host_ptr as *mut Person);
 
-            let name = Var::from_borrow(args[1]);
+            // Check if first arg is self or nme
+            let name = {
+            let first_arg = Var::from_borrow(args[1]);
+            if first_arg.is_string() {
+                first_arg
+            } else {
+                Var::from_borrow(args[2])
+            }
+            };
+
             p.set_name(name.get_string().unwrap().clone());
 
             Var::into_raw(Var::new_null())
@@ -75,12 +84,10 @@ mod tests {
             pixel_object.add_callback("set_name", set_name, opaque);
             pixel_object.add_callback("get_name", get_name, opaque);
 
-            let pixel_arc = Arc::new(pixel_object);
-
             // Save...
-            let idx = LuaScripting::save_object(Arc::clone(&pixel_arc));
+            let var = pixelscript_var_newhost_object(pixel_object.into_raw());
 
-            Var::into_raw(Var::new_host_object(idx))
+            var.into_raw()
         }
     }
 
@@ -147,6 +154,8 @@ mod tests {
 
     #[test]
     fn test_execute() {
+        pixelscript_initialize();
+
         test_add_variable();
         test_add_callback();
         test_add_module();
@@ -166,11 +175,13 @@ mod tests {
 
             local person = Person("Jordan")
             println(person.get_name())
-            person.set_name("Jordan Castro")
+            person:set_name("Jordan Castro")
             println(person:get_name())
         "#;
         let err = LuaScripting::execute(lua_code, "<test>");
 
         assert!(err.is_empty(), "Error is not empty: {}", err);
+
+        pixelscript_finalize();
     }
 }

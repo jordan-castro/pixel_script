@@ -3,7 +3,7 @@ use std::ffi::c_void;
 use mlua::prelude::*;
 // use mlua::{Integer, IntoLua, Lua, MultiValue, Value::Nil, Variadic};
 
-use crate::{lua::get_state, shared::{func::{Func, get_function_lookup}, var::Var}};
+use crate::{lua::get_state, shared::{PixelScriptRuntime, func::{Func, get_function_lookup}, var::Var}};
 
 /// For internal use since modules also need to use the same logic for adding a Lua callback.
 pub(super) fn internal_add_callback(lua: &Lua, func: Func, opaque: *mut c_void, obj: Option<i32>) -> LuaFunction {
@@ -21,6 +21,9 @@ pub(super) fn internal_add_callback(lua: &Lua, func: Func, opaque: *mut c_void, 
 
             (data.func, data.opaque)
         };
+
+        // Pass in the runtime type
+        argv.push(Var::new_i64(PixelScriptRuntime::Lua as i64));
 
         // If a obj is passed
         if let Some(obj) = obj {

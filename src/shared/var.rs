@@ -115,11 +115,7 @@ pub union VarValue {
 /// When working with objects you must use the C-api:
 /// ```c
 /// // Calls a method on a object.
-/// pixelscript_object_call()
-/// // Gets a value from a object (key -> value pair).
-/// pixelscript_object_get()
-/// // Sets a value on a object (key -> value pair)
-/// pixelscript_object_set()
+/// pixelscript_object_call(var)
 /// ```
 /// 
 /// When using within a callback, if said callback was attached to a Class, the first *mut Var will be the class/object.
@@ -275,23 +271,6 @@ impl Var {
         }
     }
 
-    /// Do object.call
-    pub fn call_method<P: ObjectMethods>(&self, provider: &P, method: &str, args: Vec<Var>) -> Result<Var, Error> {
-        let tags = vec![
-            VarType::Object,
-            VarType::HostObject,
-            VarType::Int32,
-            VarType::Int64,
-            VarType::UInt64,
-            VarType::UInt32,
-        ];
-        if !tags.contains(&self.tag) {
-            return Err(anyhow!("variable is not a Object."));
-        }
-
-        provider.object_call(self, method, args)
-    }
-
     write_func!(
         (get_i32, i32_val, i32, VarType::Int32),
         (get_u32, u32_val, u32, VarType::UInt32),
@@ -390,5 +369,5 @@ impl Clone for Var {
 
 pub trait ObjectMethods {
     /// Call a method on a object.
-    fn object_call(&self, var: &Var, method: &str, args: Vec<Var>) -> Result<Var, Error>;
+    fn object_call(var: &Var, method: &str, args: Vec<Var>) -> Result<Var, Error>;
 }

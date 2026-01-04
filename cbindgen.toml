@@ -1,0 +1,6 @@
+language = "C"
+braces = "SameLine"
+includes = []
+
+[export]
+include = []

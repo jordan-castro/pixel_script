@@ -4,9 +4,9 @@ pub mod module;
 pub mod var;
 
 use mlua::prelude::*;
-use std::sync::{Arc, Mutex, OnceLock};
+use std::sync::{Mutex, OnceLock};
 
-use crate::{lua::object::create_object, shared::{PixelScript, object::{PixelObject, get_object_lookup}, var::{ObjectMethods, Var}}};
+use crate::{lua::object::create_object, shared::{PixelScript, object::{get_object_lookup}, var::{ObjectMethods, Var}}};
 
 /// This is the Lua state. Each language gets it's own private state
 struct State {
@@ -65,9 +65,7 @@ impl PixelScript for LuaScripting {
         execute(code, file_name)
     }
 
-    fn add_object_variable(name: &str, source: Arc<PixelObject>) {
-        // Get new IDX.
-        let idx = Self::save_object(source);
+    fn add_object_variable(name: &str, idx: i32) {
         // Pass just the idx into the variable... This is a interesting one....
         LuaScripting::add_variable(name, &&Var::new_host_object(idx));
     }
@@ -85,12 +83,6 @@ impl PixelScript for LuaScripting {
         state.engine.gc_collect().unwrap();
     }
     
-    fn save_object(source: Arc<crate::shared::object::PixelObject>) -> i32 {
-        let mut object_lookup = get_object_lookup();
-        let idx = object_lookup.add_object(Arc::clone(&source));
-        idx
-    }
-    
     fn add_object(name: &str, callback: crate::shared::func::Func, opaque: *mut std::ffi::c_void) {
         // In LUA it's just a regular callback.
         LuaScripting::add_callback(name, callback, opaque);
@@ -99,7 +91,6 @@ impl PixelScript for LuaScripting {
 
 impl ObjectMethods for LuaScripting {
     fn object_call(
-        &self,
         var: &crate::shared::var::Var,
         method: &str,
         args: Vec<crate::shared::var::Var>,

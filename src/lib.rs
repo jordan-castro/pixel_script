@@ -6,8 +6,10 @@ use std::{
 };
 
 use crate::{
-    lua::LuaScripting,
-    shared::{PixelScript, PtrMagic, func::get_function_lookup, module::Module, object::{FreeMethod, PixelObject, get_object_lookup}},
+    lua::{LuaScripting, object},
+    shared::{
+        PixelScript, PixelScriptRuntime, PtrMagic, func::get_function_lookup, module::Module, object::{FreeMethod, PixelObject, get_object_lookup}, var::{ObjectMethods, VarType}
+    },
 };
 
 pub mod shared;
@@ -63,14 +65,27 @@ macro_rules! create_raw_string {
     ($rstr:expr) => {{ CString::new($rstr).unwrap().into_raw() }};
 }
 
+/// Assert that the module is initiated.
 macro_rules! assert_initiated {
     () => {{
         unsafe {
-            if !IS_INIT {
-                panic!("Pixel Script library is not initialized.");
-            }
+            assert!(IS_INIT, "Pixel script library is not initialized.");
+            // if !IS_INIT {
+                // panic!("Pixel Script library is not initialized.");
+            // }
         }
     }};
+}
+
+/// Add the methods for creating a pixel var.
+macro_rules! make_pixel_var {
+    ($($ffi_name:ident, $internal_method:ident, $t:ty);*) => {
+        $(
+        #[unsafe(no_mangle)]
+        pub extern "C" fn $ffi_name(val: $t) -> Var {
+            Var::$internal_method(val)
+        })*
+    };
 }
 
 /// Is initialized?
@@ -93,7 +108,7 @@ pub extern "C" fn pixelscript_initialize() {
         }
         if !IS_INIT {
             with_feature!("lua", {
-                LuaScripting::start(); 
+                LuaScripting::start();
             });
         }
         IS_INIT = true;
@@ -127,6 +142,10 @@ pub extern "C" fn pixelscript_finalize() {
 #[unsafe(no_mangle)]
 pub extern "C" fn pixelscript_add_variable(name: *const c_char, variable: &Var) {
     assert_initiated!();
+    if name.is_null() {
+        return;
+    }
+
     // Get string as rust.
     let r_str = borrow_string!(name);
     if r_str.is_empty() {
@@ -301,7 +320,7 @@ pub extern "C" fn pixelscript_add_module(module_ptr: *mut Module) {
 
 /// Optionally free a module if you changed your mind.
 #[unsafe(no_mangle)]
-pub extern "C" fn pixelmods_free_module(module_ptr: *mut Module) {
+pub extern "C" fn pixelscript_free_module(module_ptr: *mut Module) {
     assert_initiated!();
 
     if module_ptr.is_null() {
@@ -312,12 +331,15 @@ pub extern "C" fn pixelmods_free_module(module_ptr: *mut Module) {
 }
 
 /// Create a new object.
-/// 
+///
 /// This should only be used within a PixelScript function callback, or globally set to 1 variable.
-/// 
+///
 /// This must be wrapped in a `pixelscript_var_object` before use within a callback. If setting to a variable, this is done automatically for you.
 #[unsafe(no_mangle)]
-pub extern "C" fn pixelscript_new_object(ptr: *mut c_void, free_method: FreeMethod) -> *mut PixelObject {
+pub extern "C" fn pixelscript_new_object(
+    ptr: *mut c_void,
+    free_method: FreeMethod,
+) -> *mut PixelObject {
     assert_initiated!();
     if ptr.is_null() {
         return ptr::null_mut();
@@ -328,7 +350,12 @@ pub extern "C" fn pixelscript_new_object(ptr: *mut c_void, free_method: FreeMeth
 
 /// Add a callback to a object.
 #[unsafe(no_mangle)]
-pub extern "C" fn pixelscript_object_add_callback(object_ptr: *mut PixelObject, name: *const c_char, callback: Func, opaque: *mut c_void) {
+pub extern "C" fn pixelscript_object_add_callback(
+    object_ptr: *mut PixelObject,
+    name: *const c_char,
+    callback: Func,
+    opaque: *mut c_void,
+) {
     assert_initiated!();
 
     if object_ptr.is_null() || name.is_null() {
@@ -336,14 +363,17 @@ pub extern "C" fn pixelscript_object_add_callback(object_ptr: *mut PixelObject, 
     }
 
     // Borrow ptr
-    let object_borrow = unsafe{PixelObject::from_borrow(object_ptr)};
+    let object_borrow = unsafe { PixelObject::from_borrow(object_ptr) };
     let name_borrow = borrow_string!(name);
     object_borrow.add_callback(name_borrow, callback, opaque);
 }
 
 /// Add a object as a variable.
 #[unsafe(no_mangle)]
-pub extern "C" fn pixelscript_add_object_variable(name: *const c_char, object_ptr: *mut PixelObject) {
+pub extern "C" fn pixelscript_add_object_variable(
+    name: *const c_char,
+    object_ptr: *mut PixelObject,
+) {
     assert_initiated!();
 
     if name.is_null() || object_ptr.is_null() {
@@ -354,17 +384,21 @@ pub extern "C" fn pixelscript_add_object_variable(name: *const c_char, object_pt
     let pixel_object = Arc::new(PixelObject::from_raw(object_ptr));
     let name_borrow = borrow_string!(name);
 
+    // Save object
+    let mut object_lookup = get_object_lookup();
+    let idx = object_lookup.add_object(Arc::clone(&pixel_object));
+
     with_feature!("lua", {
-        LuaScripting::add_object_variable(name_borrow, Arc::clone(&pixel_object));
+        LuaScripting::add_object_variable(name_borrow, idx);
     });
 
     // Drops original object? NO because they live within the lookup!
 }
 
 /// Add a object to a Module.
-/// 
+///
 /// This essentially makes it so that when constructing this Module, this object is instanced.
-/// 
+///
 /// Depending on the language, you may need to wrap the construction. For example lua:
 /// ```lua
 /// // Let's say we have a object "Person"
@@ -372,19 +406,24 @@ pub extern "C" fn pixelscript_add_object_variable(name: *const c_char, object_pt
 /// p.set_name("Jordan Castro")
 /// local name = p.get_name()
 /// ```
-/// 
+///
 /// In Python:
 /// ```python
 /// p = Person("Jordan", 23)
 /// // etc
 /// ```
-/// 
+///
 /// In JS/easyjs:
 /// ```js
 /// let p = new Person("Jordan", 23);
 /// ```
 #[unsafe(no_mangle)]
-pub extern "C" fn pixelscript_module_add_object(module_ptr: *mut Module, name: *const c_char, object_constructor: Func, opaque: *mut c_void) {
+pub extern "C" fn pixelscript_module_add_object(
+    module_ptr: *mut Module,
+    name: *const c_char,
+    object_constructor: Func,
+    opaque: *mut c_void,
+) {
     assert_initiated!();
 
     if module_ptr.is_null() || name.is_null() {
@@ -392,9 +431,149 @@ pub extern "C" fn pixelscript_module_add_object(module_ptr: *mut Module, name: *
     }
 
     // Borrow module
-    let module_borrow = unsafe{Module::from_borrow(module_ptr)};
+    let module_borrow = unsafe { Module::from_borrow(module_ptr) };
     let name_borrow = borrow_string!(name);
 
     // Add
-    module_borrow.add_object(name_borrow, object_constructor, opaque); 
+    module_borrow.add_object(name_borrow, object_constructor, opaque);
+}
+
+/// Make a new Var string.
+/// 
+/// Does take ownership
+#[unsafe(no_mangle)]
+pub extern "C" fn pixelscript_var_newstring(str: *mut c_char) -> Var {
+    let val = own_string!(str);
+    Var::new_string(val)
+}
+
+/// Make a new Null var.
+#[unsafe(no_mangle)]
+pub extern "C" fn pixelscript_var_newnull() -> Var {
+    Var::new_null()
+}
+
+/// Make a new HostObject var.
+/// 
+/// If not a valid pointer, will return null
+/// 
+/// Transfers ownership
+#[unsafe(no_mangle)]
+pub extern "C" fn pixelscript_var_newhost_object(pixel_object: *mut PixelObject) -> Var {
+    assert_initiated!();
+
+    if pixel_object.is_null() {
+        return Var::new_null();
+    }
+
+    // Own the pixel_object
+    let pixel_owned = PixelObject::from_raw(pixel_object);
+    // Arc it
+    let pixel_arc = Arc::new(pixel_owned);
+
+    // Create it in the system
+    let mut object_lookup = get_object_lookup();
+    let idx = object_lookup.add_object(Arc::clone(&pixel_arc));
+
+    Var::new_host_object(idx)
+}
+
+/// Create a new variable i32.
+#[unsafe(no_mangle)]
+pub extern "C" fn pixelscript_var_newi32(val: i32) -> Var {
+    Var::new_i32(val)
+}
+/// Create a new variable u32.
+#[unsafe(no_mangle)]
+pub extern "C" fn pixelscript_var_newu32(val: u32) -> Var {
+    Var::new_u32(val)
+}
+/// Create a new variable i64.
+#[unsafe(no_mangle)]
+pub extern "C" fn pixelscript_var_newi64(val: i64) -> Var {
+    Var::new_i64(val)
+}
+/// Create a new variable u64.
+#[unsafe(no_mangle)]
+pub extern "C" fn pixelscript_var_newu64(val: u64) -> Var {
+    Var::new_u64(val)
+}
+/// Create a new variable bool.
+#[unsafe(no_mangle)]
+pub extern "C" fn pixelscript_var_newbool(val: bool) -> Var {
+    Var::new_bool(val)
+}
+
+/// Object call.
+/// 
+/// All memory is borrowed.
+/// 
+/// You can get the runtime from the first Var in any callback.
+/// 
+/// Example
+/// ```C 
+///     // Inside a Var* method
+///     Var* obj = argv[1];
+///     Var name = pixelscript_object_call()
+/// ```
+#[unsafe(no_mangle)]
+pub extern "C" fn pixelscript_object_call(runtime: *mut Var, var: *mut Var, method: *const c_char, argc: usize, argv: *mut *mut Var) -> Var {
+    assert_initiated!();
+
+    if var.is_null() || method.is_null() || argv.is_null() || runtime.is_null() {
+        return Var::new_null();
+    }
+
+    // Borrow runtime, var, and method, and argv
+    let runtime_borrow = unsafe {Var::from_borrow(runtime)};
+    let var_borrow = unsafe {Var::from_borrow(var)};
+    let method_borrow = borrow_string!(method);
+    let argv_borrow: &[*mut Var] = unsafe {Var::slice_raw(argv, argc)};
+    let args = argv_borrow.iter()
+        .filter(|ptr| !ptr.is_null()) // Always check for nulls from C
+        .map(|&ptr| (unsafe { (*ptr).clone() }).clone())   // Dereference and clone
+        .collect();
+
+    // Check that runtime is acually a int
+    let runtime = runtime_borrow.get_i64();
+    if runtime.is_err() {
+        return Var::new_null();
+    }
+
+    let runtime = PixelScriptRuntime::from_i32(runtime.unwrap() as i32);
+    if runtime.is_none() {
+        return Var::new_null();
+    }
+    let runtime = runtime.unwrap();
+
+    // Ensure type
+    let tags = vec![
+        VarType::Object,
+        VarType::HostObject,
+        VarType::Int32,
+        VarType::Int64,
+        VarType::UInt64,
+        VarType::UInt32,
+    ];
+    if !tags.contains(&var_borrow.tag) {
+        return Var::new_null();
+    }
+
+    // This is tricky since we need to know what runtime we are using...
+    let var = match runtime {
+        PixelScriptRuntime::Lua => {
+            with_feature!("lua", {
+                LuaScripting::object_call(var_borrow, method_borrow, args)
+            })
+        },
+        PixelScriptRuntime::Python => todo!(),
+        PixelScriptRuntime::JavaScript => todo!(),
+        PixelScriptRuntime::Easyjs => todo!(),
+    };
+
+    if let Ok(var) = var {
+        var
+    } else {
+        Var::new_null()
+    }
 }

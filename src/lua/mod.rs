@@ -6,7 +6,7 @@ pub mod var;
 use mlua::prelude::*;
 use std::sync::{Mutex, OnceLock};
 
-use crate::{lua::object::create_object, shared::{PixelScript, func::get_function_lookup, object::get_object_lookup, var::{ObjectMethods, Var}}};
+use crate::{shared::{PixelScript, func::get_function_lookup, object::get_object_lookup, var::{ObjectMethods, Var}}};
 
 /// This is the Lua state. Each language gets it's own private state
 struct State {
@@ -73,7 +73,7 @@ impl PixelScript for LuaScripting {
         // Initalize the state
         let _ununsed = get_state();
     }
-    
+
     fn stop() {
         // Kill lua
         let state = get_state();
@@ -81,11 +81,11 @@ impl PixelScript for LuaScripting {
         state.engine.gc_collect().unwrap();
         state.engine.gc_collect().unwrap();
     }
-    
+
     fn add_object(name: &str, callback: crate::shared::func::Func, opaque: *mut std::ffi::c_void) {
         // In LUA it's just a regular callback.
         let mut function_lookup = get_function_lookup();
-        let idx = function_lookup.add_function(callback, opaque);
+        let idx = function_lookup.add_function(name, callback, opaque);
         LuaScripting::add_callback(name, idx);
     }
 }

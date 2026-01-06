@@ -18,6 +18,7 @@ pub type Func = unsafe extern "C" fn(
 
 /// Basic rust structure to track Funcs and opaques together.
 pub struct Function {
+    pub name: String,
     pub func: Func,
     pub opaque: *mut c_void
 }
@@ -37,9 +38,9 @@ impl FunctionLookup {
     pub fn get_function(&self, idx: i32) -> Option<&Function> {
         self.function_hash.get(&idx)
     }
-    pub fn add_function(&mut self, func: Func, opaque: *mut c_void) -> i32 {
+    pub fn add_function(&mut self, name: &str, func: Func, opaque: *mut c_void) -> i32 {
         // TODO: Allow for negative idxs.
-        self.function_hash.insert(self.function_hash.len() as i32, Function { func, opaque });
+        self.function_hash.insert(self.function_hash.len() as i32, Function {name: name.to_string(), func, opaque });
 
         return (self.function_hash.len() - 1) as i32;
     }

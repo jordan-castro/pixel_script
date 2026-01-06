@@ -1,6 +1,6 @@
-use std::sync::{Mutex, OnceLock};
+use std::{collections::HashMap, sync::{Mutex, OnceLock}};
 
-use rustpython::vm::{Interpreter, scope::Scope};
+use rustpython::vm::{Interpreter, PyObjectRef, convert::ToPyObject, scope::Scope};
 
 use crate::shared::PixelScript;
 
@@ -11,8 +11,18 @@ mod object;
 
 /// This is the Python State
 struct State {
+    /// The actual Python Interpreter
     engine: Interpreter,
-    global_scope: Scope
+    /// The global variable scope (for running in __main__)
+    global_scope: Scope,
+    /// HostObject class types
+    class_types: HashMap<String, PyObjectRef>
+}
+
+impl State {
+    pub fn add_class_type(&mut self, name: &str, class_type: PyObjectRef) {
+        self.class_types.insert(name.to_string(), class_type);
+    }
 }
 
 /// The State static variable for Lua.
@@ -26,7 +36,15 @@ fn get_state() -> std::sync::MutexGuard<'static, State> {
 
         Scope::new(None, globals)
     });
-    let mutex = STATE.get_or_init(|| Mutex::new(State { engine: interp, global_scope: scope }));
+    let mutex = STATE.get_or_init(|| 
+        Mutex::new(
+            State { 
+                engine: interp, 
+                global_scope: scope,
+                class_types: HashMap::new() 
+            }
+        )
+    );
 
     // This will block the C thread if another thread is currently using Lua
     mutex.lock().expect("Failed to lock Python State")
@@ -48,10 +66,9 @@ impl PixelScript for PythonScripting {
     fn add_variable(name: &str, variable: &crate::shared::var::Var) {
         let state = get_state();
         state.engine.enter(|vm| {
-            let t = vm.ctx.new_str("s");
-            state.global_scope.locals.set_item("t", t.into(), vm).expect("Could not set");
+            let var = variable.clone().to_pyobject(vm);
+            state.global_scope.locals.set_item(name, var.into(), vm).expect("Could not set");
         });
-        // todo!()
     }
 
     fn add_object_variable(name: &str, idx: i32) {

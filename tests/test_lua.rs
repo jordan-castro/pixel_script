@@ -136,7 +136,7 @@ mod tests {
     fn test_add_callback() {
         // Create fn idx
         let mut function_lookup = get_function_lookup();
-        let idx = function_lookup.add_function(print_wrapper, ptr::null_mut());
+        let idx = function_lookup.add_function("println", print_wrapper, ptr::null_mut());
         LuaScripting::add_callback("println", idx);
     }
 

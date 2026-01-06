@@ -32,7 +32,7 @@ fn create_module(context: &Lua, module: &Module) -> LuaTable {
         let func = callback.func.func;
         let opaque = callback.func.opaque;
 
-        let idx = function_lookup.add_function(func, opaque);
+        let idx = function_lookup.add_function(&callback.name, func, opaque);
 
         // Create lua function
         let lua_function = internal_add_callback(context, idx, None);
@@ -47,7 +47,7 @@ fn create_module(context: &Lua, module: &Module) -> LuaTable {
         let func = inner_object.func.func;
         let opaque = inner_object.func.opaque;
 
-        let idx = function_lookup.add_function(func, opaque);
+        let idx = function_lookup.add_function(&inner_object.name, func, opaque);
 
         let object_function = internal_add_callback(context, idx, None);
         module_table

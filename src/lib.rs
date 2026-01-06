@@ -174,7 +174,7 @@ pub extern "C" fn pixelscript_add_callback(name: *const c_char, func: Func, opaq
 
     // Create function in all runtimes
     let mut function_lookup = get_function_lookup();
-    let idx = function_lookup.add_function(func, opaque);
+    let idx = function_lookup.add_function(name_str, func, opaque);
 
     // Add Function to lua context
     with_feature!("lua", {

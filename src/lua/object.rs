@@ -14,7 +14,7 @@ pub(super) fn create_object(lua: &Lua, idx: i32, source: Arc<PixelObject>) -> Lu
         let func = callback.func.func;
         let opaque = callback.func.opaque;
 
-        let fn_idx = function_lookup.add_function(func, opaque);
+        let fn_idx = function_lookup.add_function(&callback.name, func, opaque);
 
         let lua_function = internal_add_callback(lua, fn_idx, Some(idx));
         table.set(callback.name.as_str(), lua_function).expect("Could not set callback to object");

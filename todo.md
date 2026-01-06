@@ -18,17 +18,21 @@
 
 - Add a LSP
 
+## LSP
+- Remove ModuleCallbacks just use Function
+- Remove ModuleVariables just use PixelVariable {name, var}
+
 ## Functions
-- Use a Vector for lookup.
+<!-- - Use a Vector for lookup. -->
 
 ## Modules
 
 ## Objects
-- Use a Vector for lookup.
+<!-- - Use a Vector for lookup. -->
+- Remove the add_var_object?
 
 ## Vars
-- pixelscript_var_geti32()
-- ...
+- 
 
 ## Lua
 - module_execute

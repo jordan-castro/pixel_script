@@ -5,11 +5,10 @@ use mlua::prelude::*;
 
 // Pure Rust goes here
 use crate::{
-    lua::create_object,
-    shared::{
+    lua::object::create_object, shared::{
         object::get_object_lookup,
         var::{Var, VarType},
-    },
+    }
 };
 
 // TODO: use LuaUnsigned for u32 and u64 maybe.

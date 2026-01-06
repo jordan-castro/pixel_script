@@ -100,8 +100,9 @@ impl PixelObject {
 
     pub fn add_callback(&mut self, name: &str, callback: Func, opaque: *mut c_void) {
         self.callbacks.push(ModuleCallback {
-            name: name.to_owned(),
-            func: Function { 
+            name: name.to_string(),
+            func: Function {
+                name: name.to_string(), 
                 func: callback, 
                 opaque
             },

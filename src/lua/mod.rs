@@ -4,22 +4,24 @@ pub mod module;
 pub mod var;
 
 use mlua::prelude::*;
-use std::sync::{Mutex, OnceLock};
+use std::{collections::HashMap, sync::{Mutex, OnceLock}};
 
-use crate::{shared::{PixelScript, func::get_function_lookup, object::get_object_lookup, var::{ObjectMethods, Var}}};
+use crate::{shared::{PixelScript, object::get_object_lookup, var::{ObjectMethods, Var}}};
 
 /// This is the Lua state. Each language gets it's own private state
 struct State {
     /// The lua engine.
     engine: Lua,
+    /// Cached Tables
+    tables: HashMap<String, LuaTable>
 }
 
 /// The State static variable for Lua.
 static STATE: OnceLock<Mutex<State>> = OnceLock::new();
 
 /// Get the state of LUA.
-fn get_state() -> std::sync::MutexGuard<'static, State> {
-    let mutex = STATE.get_or_init(|| Mutex::new(State { engine: Lua::new() }));
+fn get_lua_state() -> std::sync::MutexGuard<'static, State> {
+    let mutex = STATE.get_or_init(|| Mutex::new(State { engine: Lua::new(), tables: HashMap::new() }));
 
     // This will block the C thread if another thread is currently using Lua
     mutex.lock().expect("Failed to lock Lua State")
@@ -28,8 +30,10 @@ fn get_state() -> std::sync::MutexGuard<'static, State> {
 /// Execute some orbituary lua code.
 /// Returns a String. Empty means no error happened and was successful!
 pub fn execute(code: &str, file_name: &str) -> String {
-    let state = get_state();
-    let res = state.engine.load(code).exec();
+    let res = {
+        let state = get_lua_state();
+        state.engine.load(code).exec()
+    };
     if res.is_err() {
         let error_str = format!(
             "Error in LUA: {}, for file: {}",
@@ -46,7 +50,7 @@ pub struct LuaScripting {}
 
 impl PixelScript for LuaScripting {
     fn add_variable(name: &str, variable: &crate::shared::var::Var) {
-        var::add_variable(&get_state().engine, name, variable.clone());
+        var::add_variable(&get_lua_state().engine, name, variable.clone());
     }
 
     fn add_callback(
@@ -64,30 +68,24 @@ impl PixelScript for LuaScripting {
         execute(code, file_name)
     }
 
-    fn add_object_variable(name: &str, idx: i32) {
-        // Pass just the idx into the variable... This is a interesting one....
-        LuaScripting::add_variable(name, &&Var::new_host_object(idx));
-    }
+    // fn add_object_variable(name: &str, idx: i32) {
+    //     // Pass just the idx into the variable... This is a interesting one....
+    //     LuaScripting::add_variable(name, &&Var::new_host_object(idx));
+    // }
 
     fn start() {
         // Initalize the state
-        let _ununsed = get_state();
+        let _ununsed = get_lua_state();
     }
 
     fn stop() {
         // Kill lua
-        let state = get_state();
+        let state = get_lua_state();
 
         state.engine.gc_collect().unwrap();
         state.engine.gc_collect().unwrap();
     }
 
-    fn add_object(name: &str, callback: crate::shared::func::Func, opaque: *mut std::ffi::c_void) {
-        // In LUA it's just a regular callback.
-        let mut function_lookup = get_function_lookup();
-        let idx = function_lookup.add_function(name, callback, opaque);
-        LuaScripting::add_callback(name, idx);
-    }
 }
 
 impl ObjectMethods for LuaScripting {

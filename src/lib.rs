@@ -1,15 +1,15 @@
+use rand::{Rng, SeedableRng, distr::Alphanumeric, rngs::SmallRng};
 use shared::{func::Func, var::Var};
 use std::{
     ffi::{CStr, CString, c_char, c_void},
     ptr,
-    sync::{Arc, Mutex, MutexGuard, OnceLock},
+    sync::Arc,
 };
 
 use crate::{
-    lua::{LuaScripting, object},
-    shared::{
-        PixelScript, PixelScriptRuntime, PtrMagic, func::get_function_lookup, module::Module, object::{FreeMethod, PixelObject, get_object_lookup}, var::{ObjectMethods, VarType}
-    },
+    lua::LuaScripting, python::PythonScripting, shared::{
+        PixelScript, PixelScriptRuntime, PtrMagic, func::{clear_function_lookup, lookup_add_function}, module::Module, object::{FreeMethod, PixelObject, clear_object_lookup}, var::{ObjectMethods, VarType}
+    }
 };
 
 pub mod shared;
@@ -90,6 +90,16 @@ macro_rules! make_pixel_var {
     };
 }
 
+/// Create a random string.
+/// 
+/// Used for PixelTypes
+fn random_string() -> String {
+    const STRING_LEN: usize = 8;
+    let mut rng = SmallRng::from_rng(&mut rand::rng());
+
+    (0..STRING_LEN).map(|_| rng.sample(Alphanumeric) as char).collect()
+}
+
 /// Is initialized?
 static mut IS_INIT: bool = false;
 /// Is killed?
@@ -112,6 +122,10 @@ pub extern "C" fn pixelscript_initialize() {
             with_feature!("lua", {
                 LuaScripting::start();
             });
+
+            with_feature!("python", {
+                PythonScripting::start();
+            });
         }
         IS_INIT = true;
     }
@@ -130,12 +144,18 @@ pub extern "C" fn pixelscript_finalize() {
     }
 
     // Drop function lookup
-    get_function_lookup().function_hash.clear();
+    clear_function_lookup();
+    // get_function_lookup().function_hash.clear();
     // Drop object lookup
-    get_object_lookup().object_hash.clear();
+    clear_object_lookup();
+    // get_object_lookup().object_hash.clear();
 
     with_feature!("lua", {
         LuaScripting::stop();
+    });
+
+    with_feature!("python", {
+        PythonScripting::stop();
     });
 }
 
@@ -158,6 +178,10 @@ pub extern "C" fn pixelscript_add_variable(name: *const c_char, variable: &Var) 
     with_feature!("lua", {
         LuaScripting::add_variable(r_str, variable);
     });
+
+    with_feature!("python", {
+        PythonScripting::add_variable(r_str, variable);
+    });
 }
 
 /// Add a callback to the __main__ context.
@@ -173,12 +197,15 @@ pub extern "C" fn pixelscript_add_callback(name: *const c_char, func: Func, opaq
     }
 
     // Create function in all runtimes
-    let mut function_lookup = get_function_lookup();
-    let idx = function_lookup.add_function(name_str, func, opaque);
+    let idx = lookup_add_function(name_str, func, opaque);
 
     // Add Function to lua context
     with_feature!("lua", {
         LuaScripting::add_callback(name_str, idx);
+    });
+
+    with_feature!("python", {
+        PythonScripting::add_callback(name_str, idx);
     });
 }
 
@@ -191,7 +218,7 @@ pub extern "C" fn pixelscript_add_callback(name: *const c_char, func: Func, opaq
 pub extern "C" fn pixelscript_exec_lua(
     code: *const c_char,
     file_name: *const c_char,
-) -> *const c_char {
+) -> *mut c_char {
     assert_initiated!();
     // First convert code and file_name to rust strs
     let code_str = borrow_string!(code);
@@ -204,7 +231,34 @@ pub extern "C" fn pixelscript_exec_lua(
     }
 
     // Execute and get result
-    let result = lua::execute(code_str, file_name_str);
+    let result = LuaScripting::execute(code_str, file_name_str);
+
+    create_raw_string!(result)
+}
+
+/// Execute some Python code. Will return a String, an empty string means that the code executed successfully.
+/// 
+/// The result needs to be freed by calling `pixelscript_free_str`
+#[unsafe(no_mangle)]
+#[cfg(feature = "python")]
+pub extern "C" fn pixelscript_exec_python(
+    code: *const c_char,
+    file_name: *const c_char
+) -> *mut c_char {
+    assert_initiated!();
+
+    // Borrow code and name
+    let code_borrow = borrow_string!(code);
+    if code_borrow.is_empty() {
+        return create_raw_string!("Code is empty");
+    }
+    let file_name_borrow = borrow_string!(file_name);
+    if file_name_borrow.is_empty() {
+        return create_raw_string!("File name is empty");
+    }
+
+    // Execute
+    let result = PythonScripting::execute(code_borrow, file_name_borrow);
 
     create_raw_string!(result)
 }
@@ -256,8 +310,14 @@ pub extern "C" fn pixelscript_module_add_callback(
     let module = unsafe { Module::from_borrow(module_ptr) };
     let name_str = borrow_string!(name);
 
+    // Mangle the name
+    let full_name = format!("_{}{}", module.name, name_str);
+
+    // Save the callback
+    let idx = lookup_add_function(&full_name, func, opaque);
+
     // Now add callback
-    module.add_callback(name_str, func, opaque);
+    module.add_callback(name_str, &full_name, idx);
 }
 
 /// Add a Varible to a module.
@@ -320,6 +380,9 @@ pub extern "C" fn pixelscript_add_module(module_ptr: *mut Module) {
     with_feature!("lua", {
         LuaScripting::add_module(Arc::clone(&module));
     });
+    with_feature!("python", {
+        PythonScripting::add_module(Arc::clone(&module));
+    });
 
     // Module gets dropped here, and that is good!
 }
@@ -351,7 +414,10 @@ pub extern "C" fn pixelscript_new_object(
         return ptr::null_mut();
     }
 
-    PixelObject::new(ptr, free_method).into_raw()
+    // Create a random hash for typename
+    let typename = random_string();
+
+    PixelObject::new(ptr, free_method, &typename).into_raw()
 }
 
 /// Add a callback to a object.
@@ -371,54 +437,22 @@ pub extern "C" fn pixelscript_object_add_callback(
     // Borrow ptr
     let object_borrow = unsafe { PixelObject::from_borrow(object_ptr) };
     let name_borrow = borrow_string!(name);
-    object_borrow.add_callback(name_borrow, callback, opaque);
-}
 
-/// Add a object as a variable.
-#[unsafe(no_mangle)]
-pub extern "C" fn pixelscript_add_object_variable(
-    name: *const c_char,
-    object_ptr: *mut PixelObject,
-) {
-    assert_initiated!();
+    // Add to function lookup
+    let full_name = format!("_{}{}", object_borrow.type_name, name_borrow);
+    let idx = lookup_add_function(full_name.as_str(), callback, opaque);
 
-    if name.is_null() || object_ptr.is_null() {
-        return;
-    }
-
-    // Own the pointer
-    let pixel_object = Arc::new(PixelObject::from_raw(object_ptr));
-    let name_borrow = borrow_string!(name);
-
-    // Save object
-    let mut object_lookup = get_object_lookup();
-    let idx = object_lookup.add_object(Arc::clone(&pixel_object));
-
-    with_feature!("lua", {
-        LuaScripting::add_object_variable(name_borrow, idx);
-    });
-
-    // Drops original object? NO because they live within the lookup!
+    object_borrow.add_callback(name_borrow, full_name.as_str(), idx);
 }
 
 /// Add a object globally.
 /// 
 /// This works as a Tree/Class/Prototype depending on the language.
 /// 
-/// This is essentially just a callback but with special linking process.
+/// This is essentially just a factory callback but with special linking process.
 #[unsafe(no_mangle)]
 pub extern "C" fn pixelscript_add_object(name: *const c_char, callback: Func, opaque: *mut c_void) {
-    assert_initiated!();
-
-    if name.is_null() {
-        return;
-    }
-
-    let name_borrow = borrow_string!(name);
-
-    with_feature!("lua",{
-        LuaScripting::add_object(name_borrow, callback, opaque);
-    });
+    pixelscript_add_callback(name, callback, opaque);
 }
 
 /// Add a object to a Module.
@@ -427,16 +461,20 @@ pub extern "C" fn pixelscript_add_object(name: *const c_char, callback: Func, op
 ///
 /// Depending on the language, you may need to wrap the construction. For example lua:
 /// ```lua
-/// // Let's say we have a object "Person"
+/// -- Let's say we have a object "Person"
 /// local p = Person("Jordan", 23)
-/// p.set_name("Jordan Castro")
-/// local name = p.get_name()
+/// p:set_name("Jordan Castro")
+/// local name = p:get_name()
+/// 
+/// -- Although you could also do
+/// local p = Person("Jordan", 23)
+/// p.set_name(p, "Jordan") -- You get the idea
 /// ```
 ///
 /// In Python:
 /// ```python
 /// p = Person("Jordan", 23)
-/// // etc
+/// # etc
 /// ```
 ///
 /// In JS/easyjs:
@@ -450,18 +488,7 @@ pub extern "C" fn pixelscript_module_add_object(
     object_constructor: Func,
     opaque: *mut c_void,
 ) {
-    assert_initiated!();
-
-    if module_ptr.is_null() || name.is_null() {
-        return;
-    }
-
-    // Borrow module
-    let module_borrow = unsafe { Module::from_borrow(module_ptr) };
-    let name_borrow = borrow_string!(name);
-
-    // Add
-    module_borrow.add_object(name_borrow, object_constructor, opaque);
+    pixelscript_module_add_callback(module_ptr, name, object_constructor, opaque);
 }
 
 /// Make a new Var string.
@@ -498,8 +525,9 @@ pub extern "C" fn pixelscript_var_newhost_object(pixel_object: *mut PixelObject)
     let pixel_arc = Arc::new(pixel_owned);
 
     // Create it in the system
-    let mut object_lookup = get_object_lookup();
-    let idx = object_lookup.add_object(Arc::clone(&pixel_arc));
+    lookup_add_i
+    // let mut object_lookup = get_object_lookup();
+    // let idx = object_lookup.add_object(Arc::clone(&pixel_arc));
 
     Var::new_host_object(idx).into_raw()
 }
@@ -705,9 +733,9 @@ pub extern "C" fn pixelscript_var_get_bool(var: *mut Var) -> bool {
 /// 
 /// You have to free this memory by calling `pixelscript_free_str`
 #[unsafe(no_mangle)]
-pub extern "C" fn pixelscript_var_get_string(var: *mut Var) -> *const c_char {
+pub extern "C" fn pixelscript_var_get_string(var: *mut Var) -> *mut c_char {
     if var.is_null() {
-        return ptr::null();
+        return ptr::null_mut();
     }
 
     unsafe {

@@ -1,8 +1,8 @@
-use std::ffi::c_void;
+use std::{ffi::c_void, sync::Arc};
 
 use rustpython::vm::{PyObject, PyObjectRef, TryFromObject, convert::ToPyObject};
 
-use crate::shared::{object::get_object_lookup, var::Var};
+use crate::{python::object::create_object, shared::{object::get_object_lookup, var::Var}};
 
 impl ToPyObject for Var {
     fn to_pyobject(self, vm: &rustpython::vm::VirtualMachine) -> rustpython::vm::PyObjectRef {
@@ -49,6 +49,9 @@ impl ToPyObject for Var {
                     let lang_ptr_is_null = pixel_object.lang_ptr.lock().unwrap().is_null();
                     if lang_ptr_is_null {
                         // Create the object for the first and mutate the pixel object TODO.
+                        let pyobj = create_object(vm, idx, Arc::clone(&pixel_object));
+                        // Set pointer
+                        pixel_object.update_lang_ptr(pyobj.into_raw() as *mut c_void);
                     }
 
                     // Get PTR again

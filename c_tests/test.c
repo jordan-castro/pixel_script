@@ -61,7 +61,7 @@ Var* ps_set_name(uintptr_t argc, struct Var **argv, void *opaque) {
     Var* name = argv[3]; // In this example we use LUA, so we will stick to it.
 
     Person* p = pixelscript_var_get_host_object(object);
-    const char* new_name = pixelscript_var_get_string(name);
+    char* new_name = pixelscript_var_get_string(name);
 
     set_name(p, new_name);
 
@@ -102,7 +102,7 @@ Var* new_person(uintptr_t argc, struct Var **argv, void *opaque) {
     Var* age_var = argv[2];
 
     // Get name string
-    const char* name_str = pixelscript_var_get_string(name);
+    char* name_str = pixelscript_var_get_string(name);
     int age = pixelscript_var_get_i64(age_var);
 
     // Create person
@@ -134,7 +134,8 @@ int main() {
                          "p:greet()\n"
                          "p:set_name('Jordan Castro + ' .. p:get_age())\n"
                          "p:greet()\n";
-    pixelscript_exec_lua(script, "<ctest>");
+    char* res = pixelscript_exec_lua(script, "<ctest>");
+    pixelscript_free_str(res);
 
     pixelscript_finalize();
 

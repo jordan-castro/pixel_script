@@ -1290,6 +1290,7 @@ dependencies = [
  "anyhow",
  "cbindgen",
  "mlua",
+ "rand 0.9.2",
  "rustpython",
 ]
 

@@ -1,8 +1,8 @@
-use std::{collections::HashMap, sync::{Mutex, OnceLock}};
+use std::{collections::HashMap, sync::{Arc, Mutex, OnceLock}};
 
-use rustpython::vm::{Interpreter, PyObjectRef, convert::ToPyObject, scope::Scope};
+use rustpython::vm::{self, Interpreter, PyObjectRef, convert::ToPyObject, scope::Scope};
 
-use crate::shared::PixelScript;
+use crate::{python::{func::create_function, module::create_module}, shared::PixelScript};
 
 mod var;
 mod func;
@@ -15,15 +15,45 @@ struct State {
     engine: Interpreter,
     /// The global variable scope (for running in __main__)
     global_scope: Scope,
-    /// HostObject class types
-    class_types: HashMap<String, PyObjectRef>
+    /// Cached class types
+    class_types: HashMap<String, PyObjectRef>,
+    /// Cached leaked names.
+    cached_leaks: HashMap<String,  *mut str>
 }
 
 impl State {
-    pub fn add_class_type(&mut self, name: &str, class_type: PyObjectRef) {
-        self.class_types.insert(name.to_string(), class_type);
+    unsafe fn new_str_leak(&mut self, s: String) -> &'static str {
+        if let Some(&ptr) = self.cached_leaks.get(&s) {
+            return unsafe {&*ptr};
+        }
+
+        // Convert String -> Box<str> -> *mut str
+        let b = s.clone().into_boxed_str();
+        let ptr = Box::into_raw(b);
+
+        // Store in cache
+        self.cached_leaks.insert(s, ptr);
+
+        // Return as static reference
+        unsafe {&*ptr}
     }
 }
+
+impl Drop for State {
+    fn drop(&mut self) {
+        self.class_types.clear();
+
+        for (_, ptr) in self.cached_leaks.drain() {
+            if !ptr.is_null() {
+                unsafe {
+                    let _ = Box::from_raw(ptr);
+                }
+            }
+        }
+    }
+}
+unsafe impl Send for State {}
+unsafe impl Sync for State {}
 
 /// The State static variable for Lua.
 static STATE: OnceLock<Mutex<State>> = OnceLock::new();
@@ -41,7 +71,8 @@ fn get_state() -> std::sync::MutexGuard<'static, State> {
             State { 
                 engine: interp, 
                 global_scope: scope,
-                class_types: HashMap::new() 
+                class_types: HashMap::new(),
+                cached_leaks: HashMap::new()
             }
         )
     );
@@ -59,8 +90,7 @@ impl PixelScript for PythonScripting {
     }
 
     fn stop() {
-        // TODO: Stop python
-        let _state = get_state();
+        // Nothing is really needed to be done here? Except maybe do some GC?
     }
 
     fn add_variable(name: &str, variable: &crate::shared::var::Var) {
@@ -71,23 +101,33 @@ impl PixelScript for PythonScripting {
         });
     }
 
-    fn add_object_variable(name: &str, idx: i32) {
-        todo!()
-    }
-
     fn add_callback(name: &str, fn_idx: i32) {
-        todo!()
+        let state = get_state();
+        state.engine.enter(|vm| {
+            let pyfunc = create_function(vm, name, fn_idx);
+            // Attach it
+            state.global_scope.locals.set_item(name, pyfunc.into(), vm).expect("Could not set");
+        });
     }
 
     fn add_module(source: std::sync::Arc<crate::shared::module::Module>) {
-        todo!()
-    }
-
-    fn add_object(name: &str, callback: crate::shared::func::Func, opaque: *mut std::ffi::c_void) {
-        todo!()
+        let state = get_state();
+        state.engine.enter(|vm| {
+            create_module(vm, Arc::clone(&source));
+        });
     }
 
     fn execute(code: &str, file_name: &str) -> String {
-        todo!()
+        let state = get_state();
+        state.engine.enter(|vm| {
+            match vm.compile(code, vm::compiler::Mode::Exec, file_name.to_string()) {
+                Ok(r) => {
+                    r.to_string()
+                },
+                Err(e) => {
+                    e.to_string()
+                },
+            }
+        })
     }
 }

@@ -2,5 +2,7 @@ language = "C"
 braces = "SameLine"
 includes = []
 
+include_guard = "PIXEL_SCRIPT_H"
+
 [export]
 include = []

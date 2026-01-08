@@ -1,10 +1,5 @@
 # TODO
 
-- module_add_module
-
-- variable helper methods
-- module helper methods
-
 - add rust first functions? (i.e. in lib add rust specific functions.)
 
 - code as module
@@ -15,6 +10,10 @@
 
 - Make better use of anyhow
 - C tests
+    - Lua
+    - Python
+    - JS
+    - Easyjs
 
 - Add a LSP
 
@@ -32,7 +31,7 @@
 - Remove the add_var_object?
 
 ## Vars
-- 
+- add var_is_* type methods to clib
 
 ## Lua
 - module_execute

@@ -1,3 +1,6 @@
+#ifndef PIXEL_SCRIPT_H
+#define PIXEL_SCRIPT_H
+
 #include <stdarg.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -228,7 +231,15 @@ void pixelscript_add_callback(const char *name, Func func, void *opaque);
  *
  * The result needs to be freed by calling `pixelscript_free_str`
  */
-const char *pixelscript_exec_lua(const char *code, const char *file_name);
+char *pixelscript_exec_lua(const char *code, const char *file_name);
+
+/**
+ * Execute some Python code. Will return a String, an empty string means that the code executed successfully.
+ *
+ * The result needs to be freed by calling `pixelscript_free_str`
+ */
+char *pixelscript_exec_python(const char *code,
+                              const char *file_name);
 
 /**
  * Free the string created by the pixelscript library
@@ -297,16 +308,11 @@ void pixelscript_object_add_callback(struct PixelObject *object_ptr,
                                      void *opaque);
 
 /**
- * Add a object as a variable.
- */
-void pixelscript_add_object_variable(const char *name, struct PixelObject *object_ptr);
-
-/**
  * Add a object globally.
  *
  * This works as a Tree/Class/Prototype depending on the language.
  *
- * This is essentially just a callback but with special linking process.
+ * This is essentially just a factory callback but with special linking process.
  */
 void pixelscript_add_object(const char *name, Func callback, void *opaque);
 
@@ -317,16 +323,20 @@ void pixelscript_add_object(const char *name, Func callback, void *opaque);
  *
  * Depending on the language, you may need to wrap the construction. For example lua:
  * ```lua
- * // Let's say we have a object "Person"
+ * -- Let's say we have a object "Person"
  * local p = Person("Jordan", 23)
- * p.set_name("Jordan Castro")
- * local name = p.get_name()
+ * p:set_name("Jordan Castro")
+ * local name = p:get_name()
+ *
+ * -- Although you could also do
+ * local p = Person("Jordan", 23)
+ * p.set_name(p, "Jordan") -- You get the idea
  * ```
  *
  * In Python:
  * ```python
  * p = Person("Jordan", 23)
- * // etc
+ * # etc
  * ```
  *
  * In JS/easyjs:
@@ -457,7 +467,7 @@ bool pixelscript_var_get_bool(struct Var *var);
  *
  * You have to free this memory by calling `pixelscript_free_str`
  */
-const char *pixelscript_var_get_string(struct Var *var);
+char *pixelscript_var_get_string(struct Var *var);
 
 /**
  * Get the pointer of the Host Object
@@ -470,3 +480,5 @@ void *pixelscript_var_get_host_object(struct Var *var);
  * Get the IDX of the PixelObject
  */
 int32_t pixelscript_var_get_object_idx(struct Var *var);
+
+#endif  /* PIXEL_SCRIPT_H */

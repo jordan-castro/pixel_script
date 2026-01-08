@@ -2,7 +2,6 @@ use std::{collections::HashMap, os::raw::c_void, ptr, sync::{Arc, Mutex, OnceLoc
 
 use crate::shared::{
     PtrMagic,
-    func::{Func, Function},
     module::ModuleCallback,
 };
 
@@ -73,6 +72,8 @@ pub type FreeMethod = unsafe extern "C" fn(ptr: *mut c_void);
 ///
 /// This is why a Objects are more like Pseudo types than actual class/objects.
 pub struct PixelObject {
+    /// Type name (this is a hash)
+    pub type_name: String,
     /// The Host pointer
     pub ptr: *mut c_void,
     /// The language object pointer.
@@ -89,23 +90,21 @@ pub struct PixelObject {
 }
 
 impl PixelObject {
-    pub fn new(ptr: *mut c_void, free_method: FreeMethod) -> Self {
+    pub fn new(ptr: *mut c_void, free_method: FreeMethod, type_name: &str) -> Self {
         Self {
             ptr,
             free_method,
             callbacks: vec![],
-            lang_ptr: Mutex::new(ptr::null_mut())
+            lang_ptr: Mutex::new(ptr::null_mut()),
+            type_name: type_name.to_string()
         }
     }
 
-    pub fn add_callback(&mut self, name: &str, callback: Func, opaque: *mut c_void) {
+    pub fn add_callback(&mut self, name: &str, full_name: &str, idx: i32) {
         self.callbacks.push(ModuleCallback {
             name: name.to_string(),
-            func: Function {
-                name: name.to_string(), 
-                func: callback, 
-                opaque
-            },
+            full_name: full_name.to_string(),
+            idx
         });
     }
 
@@ -148,23 +147,11 @@ pub struct ObjectLookup {
     pub object_hash: HashMap<i32, Arc<PixelObject>>
 }
 
-impl ObjectLookup {
-    pub fn get_object(&self, idx: i32) -> Option<&Arc<PixelObject>> {
-        self.object_hash.get(&idx)
-    }
-    pub fn add_object(&mut self, pixel_object: Arc<PixelObject>) -> i32 {
-        // TODO: Allow for negative idxs.
-        self.object_hash.insert(self.object_hash.len() as i32, pixel_object);
-
-        return (self.object_hash.len() - 1) as i32;
-    }
-}
-
 /// The object lookup!
 static OBJECT_LOOKUP: OnceLock<Mutex<ObjectLookup>> = OnceLock::new();
 
 /// Get the Object lookup global state. Shared between all runtimes.
-pub fn get_object_lookup() -> std::sync::MutexGuard<'static, ObjectLookup> {
+fn get_object_lookup() -> std::sync::MutexGuard<'static, ObjectLookup> {
     OBJECT_LOOKUP.get_or_init(|| {
         Mutex::new(ObjectLookup {
             object_hash: HashMap::new(),
@@ -173,3 +160,11 @@ pub fn get_object_lookup() -> std::sync::MutexGuard<'static, ObjectLookup> {
     .lock()
     .unwrap()
 }
+
+pub(crate) fn clear_object_lookup() {
+    let mut lookup = get_object_lookup();
+    lookup.object_hash.clear();
+}
+
+// add_object(Arc::clone(&pixel_arc))
+pub(crate) fn lookup_add_object(pi) {}

@@ -1,8 +1,5 @@
-use std::ffi::c_void;
-
 use crate::shared::{
     PtrMagic,
-    func::{Func, Function},
     var::Var,
 };
 
@@ -39,14 +36,13 @@ pub struct Module {
     pub variables: Vec<ModuleVariable>,
     /// Internal modules
     pub modules: Vec<Module>,
-    /// Objects assigned to this Module
-    pub objects: Vec<ModuleCallback>,
 }
 
-/// Wraps a Func with a name.
+/// Wraps a idx with a name.
 pub struct ModuleCallback {
     pub name: String,
-    pub func: Function,
+    pub full_name: String,
+    pub idx: i32
 }
 
 /// Wraps a Var with a name.
@@ -63,15 +59,15 @@ impl Module {
             callbacks: vec![],
             variables: vec![],
             modules: vec![],
-            objects: vec![],
         }
     }
 
     /// Add a callback to current module.
-    pub fn add_callback(&mut self, name: &str, func: Func, opaque: *mut c_void) {
+    pub fn add_callback(&mut self, name: &str, full_name: &str, idx: i32) {
         self.callbacks.push(ModuleCallback {
             name: name.to_string(),
-            func: Function { name: name.to_string(), func, opaque },
+            full_name: full_name.to_string(),
+            idx
         });
     }
 
@@ -86,18 +82,6 @@ impl Module {
     /// Add a internal module.
     pub fn add_module(&mut self, child: Module) {
         self.modules.push(child);
-    }
-
-    /// Add a internal object.
-    pub fn add_object(&mut self, name: &str, constructor: Func, opaque: *mut c_void) {
-        self.objects.push(ModuleCallback {
-            name: name.to_owned(),
-            func: Function {
-                name: name.to_string(),
-                func: constructor,
-                opaque,
-            },
-        });
     }
 }
 

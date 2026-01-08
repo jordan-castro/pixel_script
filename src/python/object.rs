@@ -2,14 +2,11 @@ use std::sync::Arc;
 
 use rustpython::vm::{PyObjectRef, TryFromObject, VirtualMachine, convert::ToPyObject, function::FuncArgs, types::{PyTypeFlags, PyTypeSlots}};
 
-use crate::{python::get_state, shared::{PixelScriptRuntime, func::call_function, object::PixelObject, var::Var}};
+use crate::{python::{get_class_type_from_cache, pystr_leak, store_class_type_in_cache}, shared::{PixelScriptRuntime, func::call_function, object::PixelObject, var::Var}};
 
 /// Create object callback methods
 fn create_object_method(vm: &VirtualMachine, fn_name: &str, fn_idx: i32) -> PyObjectRef {
-    let mut state = get_state();
-    let static_name = unsafe {
-     state.new_str_leak(fn_name.to_string())
-    };
+    let static_name = unsafe { pystr_leak(fn_name.to_string()) };
 
     vm.new_function(static_name, move |args: FuncArgs, vm: &VirtualMachine| {
         // First arg is a object
@@ -25,8 +22,8 @@ fn create_object_method(vm: &VirtualMachine, fn_name: &str, fn_idx: i32) -> PyOb
         // Object id
         argv.push(Var::new_i64(obj_id));
 
-        for arg in args.args {
-            argv.push(Var::try_from_object(vm, arg).expect("Could not convert value into Var from Python."));
+        for arg in args.args.iter().skip(1) {
+            argv.push(Var::try_from_object(vm, arg.to_owned()).expect("Could not convert value into Var from Python."));
         }
 
         unsafe {
@@ -44,8 +41,7 @@ fn create_object_method(vm: &VirtualMachine, fn_name: &str, fn_idx: i32) -> PyOb
 /// source: is the object methods
 pub(super) fn create_object(vm: &VirtualMachine, idx: i32, source: Arc<PixelObject>) -> PyObjectRef {
     // Look to see if class type already exists.
-    let mut state = get_state();
-    let class_type = state.class_types.get(&source.type_name);
+    let class_type = get_class_type_from_cache(&source.type_name);
     if let Some(class_type) = class_type {
         // One exists, create a new one and add _id
         let res = class_type.clone().call(FuncArgs::default(), vm).expect("Could not instantiate Python class");
@@ -55,9 +51,7 @@ pub(super) fn create_object(vm: &VirtualMachine, idx: i32, source: Arc<PixelObje
     }
 
     // Otherwise need to create a new one NOW
-    let static_name = unsafe {
-        state.new_str_leak(source.type_name.clone())
-    };
+    let static_name = unsafe { pystr_leak(source.type_name.clone()) };
     // Define basic slots
     let slots = PyTypeSlots::new(static_name, PyTypeFlags::HEAPTYPE | PyTypeFlags::BASETYPE | PyTypeFlags::HAS_DICT);
 
@@ -74,7 +68,7 @@ pub(super) fn create_object(vm: &VirtualMachine, idx: i32, source: Arc<PixelObje
 
     let pyobj: PyObjectRef = class_type.clone().into();
     // Save globally
-    state.class_types.insert(source.type_name.clone(), pyobj.clone());
+    store_class_type_in_cache(&source.type_name, pyobj.clone());
 
     // Attach _id
     let res= pyobj.call(FuncArgs::default(), vm).expect("Could not instantiate Python class");

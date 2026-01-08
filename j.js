@@ -1,3 +1,0 @@
-function Person() {
-    return new {};
-}

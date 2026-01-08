@@ -1,9 +1,30 @@
 #[cfg(test)]
 mod tests {
-    use std::{ffi::c_void, ptr, sync::Arc};
-
-    use pixel_script::{python::PythonScripting, shared::{PixelScript, PtrMagic, func::get_function_lookup, object::PixelObject, var::Var}, *
+    use std::{
+        ffi::{CString, c_void},
+        ptr,
     };
+
+    use pixel_script::{python::PythonScripting, shared::{PixelScript, PtrMagic, var::Var}, *
+    };
+
+    /// Create a raw string from &str.
+    ///
+    /// Remember to FREE THIS!
+    macro_rules! create_raw_string {
+        ($rstr:expr) => {{ CString::new($rstr).unwrap().into_raw() }};
+    }
+
+    /// Free a raw sring
+    macro_rules! free_raw_string {
+        ($rptr:expr) => {{
+            if !$rptr.is_null() {
+                unsafe {
+                    let _ = std::ffi::CString::from_raw($rptr);
+                }
+            }
+        }};
+    }
 
     struct Person {
         name: String,
@@ -39,12 +60,12 @@ mod tests {
 
             // Check if first arg is self or nme
             let name = {
-            let first_arg = Var::from_borrow(args[2]);
-            if first_arg.is_string() {
-                first_arg
-            } else {
-                Var::from_borrow(args[3])
-            }
+                let first_arg = Var::from_borrow(args[2]);
+                if first_arg.is_string() {
+                    first_arg
+                } else {
+                    Var::from_borrow(args[3])
+                }
             };
 
             p.set_name(name.get_string().unwrap().clone());
@@ -56,6 +77,7 @@ mod tests {
     pub extern "C" fn get_name(argc: usize, argv: *mut *mut Var, _opaque: *mut c_void) -> *mut Var {
         unsafe {
             let args = Var::slice_raw(argv, argc);
+
             // Get ptr
             let pixel_object_var = Var::from_borrow(args[1]);
             let host_ptr = pixel_object_var.get_host_ptr();
@@ -77,19 +99,16 @@ mod tests {
             let p = Person::new(p_name.clone());
 
             let ptr = Person::into_raw(p) as *mut c_void;
-            let mut pixel_object = PixelObject::new(ptr, free_person, "PersonT");
-            
-            // Save callbacks
-            let mut function_lookup = get_function_lookup();
-            let set_name_idx = function_lookup.add_function("set_name", set_name, opaque);
-            let get_name_idx = function_lookup.add_function("get_name", get_name, opaque);
-
-            pixel_object.add_callback("set_name", "", set_name_idx);
-            pixel_object.add_callback("get_name", "", get_name_idx);
-
+            let pixel_object = pixelscript_new_object(ptr, free_person);
+            let set_name_raw = create_raw_string!("set_name");
+            let get_name_raw = create_raw_string!("get_name");
+            pixelscript_object_add_callback(pixel_object, set_name_raw, set_name, opaque);
+            pixelscript_object_add_callback(pixel_object, get_name_raw, get_name, opaque);
             // Save...
-            let var = pixelscript_var_newhost_object(pixel_object.into_raw());
+            let var = pixelscript_var_newhost_object(pixel_object);
 
+            free_raw_string!(set_name_raw);
+            free_raw_string!(get_name_raw);
             var
         }
     }
@@ -103,10 +122,12 @@ mod tests {
         unsafe {
             let args = std::slice::from_raw_parts(argv, argc);
 
-            let var_ptr = Var::from_borrow(args[0]);
+            let var_ptr = Var::from_borrow(args[1]);
 
             if let Ok(msg) = var_ptr.get_string() {
-                println!("Lua sent: {}", msg);
+                println!("Python sent: {}", msg);
+            } else {
+                println!("Could not get a string?");
             }
         }
 
@@ -122,8 +143,8 @@ mod tests {
         unsafe {
             let args = std::slice::from_raw_parts(argv, argc);
 
-            let n1 = Var::from_borrow(args[0]);
-            let n2 = Var::from_borrow(args[1]);
+            let n1 = Var::from_borrow(args[1]);
+            let n2 = Var::from_borrow(args[2]);
 
             Var::new_i64(n1.value.i64_val + n2.value.i64_val).into_raw()
         }
@@ -131,39 +152,44 @@ mod tests {
 
     #[test]
     fn test_add_variable() {
+        pixelscript_initialize();
         PythonScripting::add_variable("name", &Var::new_string(String::from("Jordan")));
     }
-
     #[test]
-    fn test_add_callback() {
-        // Create fn idx
-        let mut function_lookup = get_function_lookup();
-        let idx = function_lookup.add_function("println", print_wrapper, ptr::null_mut());
-        PythonScripting::add_callback("println", idx);
+   fn test_add_callback() {
+        pixelscript_initialize();
+        let name = create_raw_string!("println");
+        pixelscript_add_callback(name, print_wrapper, ptr::null_mut());
+        free_raw_string!(name);
     }
 
     #[test]
     fn test_add_module() {
-        let mut module = shared::module::Module::new("cmath".to_string());
-
+        pixelscript_initialize();
+        let module_name = create_raw_string!("ps_math");
+        let module = pixelscript_new_module(module_name);
         // Save methods
-        let mut function_lookup = get_function_lookup();
-        let add_idx = function_lookup.add_function("m_add", add_wrapper, ptr::null_mut());
+        let add_name = create_raw_string!("add");
+        let n1_name = create_raw_string!("n1");
+        let n2_name = create_raw_string!("n2");
+        pixelscript_module_add_callback(module, add_name, add_wrapper, ptr::null_mut());
+        pixelscript_module_add_variable(module, n1_name, &Var::new_i64(1));
+        pixelscript_module_add_variable(module, n2_name, &Var::new_i64(2));
 
-        module.add_callback("add", "", add_idx);
-        module.add_variable("n1", &Var::new_i64(1));
-        module.add_variable("n2", &Var::new_i64(2));
+        pixelscript_add_module(module);
 
-        let module_arc = Arc::new(module);
-
-        PythonScripting::add_module(Arc::clone(&module_arc));
+        free_raw_string!(module_name);
+        free_raw_string!(add_name);
+        free_raw_string!(n1_name);
+        free_raw_string!(n2_name);
     }
 
     #[test]
     fn test_add_object() {
-        let mut function_lookup = get_function_lookup();
-        let person_idx = function_lookup.add_function("Person", new_person, ptr::null_mut());
-        PythonScripting::add_callback("Person", person_idx);
+        pixelscript_initialize();
+        let object_name = create_raw_string!("Person");
+        pixelscript_add_object(object_name, new_person, ptr::null_mut());
+        free_raw_string!(object_name);
     }
 
     #[test]
@@ -176,18 +202,25 @@ mod tests {
         test_add_object();
 
         let py_code = r#"
-import cmath
+import sys
+for m in sys.modules:
+    print(m)
+
+import ps_math
 
 msg = "Welcome " + name
 println(msg)
 
-result = cmath.add(cmath.n1, cmath.n2)
+result = ps_math.add(ps_math.n1, ps_math.n2)
 println(f"Module result: {result}")
 
 if result != 3:
     raise "Math, Expected 3, got " + str(result)
 
 person = Person("Jordan")
+
+println(str(dir(person)))
+
 println(person.get_name())
 person.set_name("Jordan Castro")
 println(person.get_name())

@@ -4,27 +4,44 @@ pub mod module;
 pub mod var;
 
 use mlua::prelude::*;
-use std::{collections::HashMap, sync::{Mutex, OnceLock}};
+use parking_lot::{ReentrantMutex, ReentrantMutexGuard};
+use std::{cell::RefCell, collections::HashMap, sync::{OnceLock}};
 
-use crate::{shared::{PixelScript, object::get_object_lookup, var::{ObjectMethods, Var}}};
+use crate::shared::{PixelScript, object::get_object, var::{ObjectMethods, Var}};
 
 /// This is the Lua state. Each language gets it's own private state
 struct State {
     /// The lua engine.
     engine: Lua,
     /// Cached Tables
-    tables: HashMap<String, LuaTable>
+    tables: RefCell<HashMap<String, LuaTable>>
 }
 
 /// The State static variable for Lua.
-static STATE: OnceLock<Mutex<State>> = OnceLock::new();
+static STATE: OnceLock<ReentrantMutex<State>> = OnceLock::new();
 
 /// Get the state of LUA.
-fn get_lua_state() -> std::sync::MutexGuard<'static, State> {
-    let mutex = STATE.get_or_init(|| Mutex::new(State { engine: Lua::new(), tables: HashMap::new() }));
+fn get_lua_state() -> ReentrantMutexGuard<'static, State> {
+    let mutex = STATE.get_or_init(|| {
+        ReentrantMutex::new(State { 
+            engine: Lua::new(), 
+            tables: RefCell::new(HashMap::new()) 
+        })
+    });
+    // This will 
+    mutex.lock()
+}
 
-    // This will block the C thread if another thread is currently using Lua
-    mutex.lock().expect("Failed to lock Lua State")
+/// Get a cached metatable from lua.
+pub(self) fn get_metatable(name: &str) -> Option<LuaTable> {
+    let state = get_lua_state();
+    state.tables.borrow().get(name).cloned()
+}
+
+/// Cahce a metatable.
+pub(self) fn store_metatable(name: &str, table: LuaTable) {
+    let state = get_lua_state();
+    state.tables.borrow_mut().insert(name.to_string(), table);
 }
 
 /// Execute some orbituary lua code.
@@ -97,9 +114,8 @@ impl ObjectMethods for LuaScripting {
         // Get the lua table.
         let table = unsafe {
             if var.is_host_object() {
-                let object_lookup = get_object_lookup();
                 // This is from the PTR!
-                let pixel_object = object_lookup.get_object(var.value.host_object_val).expect("No HostObject found.");
+                let pixel_object = get_object(var.value.host_object_val).expect("No HostObject found.");
                 let lang_ptr = pixel_object.lang_ptr.lock().unwrap();
                 // Get as table.
                 let table_ptr = *lang_ptr as *const LuaTable;
@@ -112,16 +128,24 @@ impl ObjectMethods for LuaScripting {
             }
         };
 
-        let state = get_state();
         // Call method
         let mut lua_args = vec![];
-        for arg in args {
-            lua_args.push(arg.into_lua(&state.engine).expect("Could not convert Var into Lua Var"));
+        {
+            // State start
+            let state = get_lua_state();
+            for arg in args {
+                lua_args.push(arg.into_lua(&state.engine).expect("Could not convert Var into Lua Var"));
+            }
+            // State drop
         }
+        // The function could potentially call the state
         let res = table.call_function(method, lua_args).expect("Could not call function on Lua Table.");
 
+        // State start again
+        let state = get_lua_state();
         let pixel_res = Var::from_lua(res, &state.engine).expect("Could not convert LuaVar into PixelScript Var.");
 
         Ok(pixel_res)
+        // Drop state
     }
 }

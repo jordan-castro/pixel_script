@@ -8,7 +8,7 @@ use std::{
 
 use crate::{
     lua::LuaScripting, python::PythonScripting, shared::{
-        PixelScript, PixelScriptRuntime, PtrMagic, func::{clear_function_lookup, lookup_add_function}, module::Module, object::{FreeMethod, PixelObject, clear_object_lookup}, var::{ObjectMethods, VarType}
+        PixelScript, PixelScriptRuntime, PtrMagic, func::{clear_function_lookup, lookup_add_function}, module::Module, object::{FreeMethod, PixelObject, clear_object_lookup, lookup_add_object}, var::{ObjectMethods, VarType}
     }
 };
 
@@ -525,9 +525,7 @@ pub extern "C" fn pixelscript_var_newhost_object(pixel_object: *mut PixelObject)
     let pixel_arc = Arc::new(pixel_owned);
 
     // Create it in the system
-    lookup_add_i
-    // let mut object_lookup = get_object_lookup();
-    // let idx = object_lookup.add_object(Arc::clone(&pixel_arc));
+    let idx = lookup_add_object(Arc::clone(&pixel_arc));
 
     Var::new_host_object(idx).into_raw()
 }

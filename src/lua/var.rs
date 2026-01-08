@@ -6,8 +6,7 @@ use mlua::prelude::*;
 // Pure Rust goes here
 use crate::{
     lua::object::create_object, shared::{
-        object::get_object_lookup,
-        var::{Var, VarType},
+        object::get_object, var::{Var, VarType}
     }
 };
 
@@ -50,8 +49,8 @@ impl IntoLua for Var {
             VarType::HostObject => {
                 unsafe {
                     let idx = self.value.host_object_val;
-                    let object_lookup = get_object_lookup();
-                    let pixel_object = object_lookup.get_object(idx).unwrap().clone();
+                    // let object_lookup = get_object_lookup();
+                    let pixel_object = get_object(idx).unwrap();
                     let lang_ptr_is_null = pixel_object.lang_ptr.lock().unwrap().is_null();
                     if lang_ptr_is_null {
                         // Create the table for the first time and mutate the pixel object.

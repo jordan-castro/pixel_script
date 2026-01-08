@@ -1,7 +1,7 @@
 use mlua::prelude::*;
 // use mlua::{Integer, IntoLua, Lua, MultiValue, Value::Nil, Variadic};
 
-use crate::{lua::get_state, shared::{PixelScriptRuntime, func::call_function, var::Var}};
+use crate::{lua::get_lua_state, shared::{PixelScriptRuntime, func::call_function, var::Var}};
 
 /// For internal use since modules also need to use the same logic for adding a Lua callback.
 pub(super) fn internal_add_callback(lua: &Lua, fn_idx: i32) -> LuaFunction {
@@ -35,7 +35,7 @@ pub(super) fn internal_add_callback(lua: &Lua, fn_idx: i32) -> LuaFunction {
 
 /// Add a callback to lua __main__ context.
 pub(super) fn add_callback(name: &str, fn_idx: i32) {
-    let state = get_state();
+    let state = get_lua_state();
     let lua_func = internal_add_callback(&state.engine, fn_idx);
     state.engine.globals().set(name, lua_func).expect("Could not add callback to Lua.");
 }

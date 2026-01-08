@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use crate::{
-    lua::{func::internal_add_callback, get_state},
+    lua::{func::internal_add_callback, get_lua_state},
     shared::module::Module,
 };
 use mlua::prelude::*;
@@ -49,7 +49,7 @@ fn create_module(context: &Lua, module: &Module) -> LuaTable {
 /// Add a module to Lua!
 pub fn add_module(module: Arc<Module>) {
     // First get lua state
-    let state = get_state();
+    let state = get_lua_state();
 
     let mod_name = module.name.clone();
     let module_for_lua = Arc::clone(&module);

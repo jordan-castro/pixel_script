@@ -167,4 +167,23 @@ pub(crate) fn clear_object_lookup() {
 }
 
 // add_object(Arc::clone(&pixel_arc))
-pub(crate) fn lookup_add_object(pi) {}
+pub(crate) fn lookup_add_object(pixel_obj: Arc<PixelObject>) -> i32 {
+    let mut lookup = get_object_lookup();
+
+    let idx = lookup.object_hash.len();
+
+    lookup.object_hash.insert(idx as i32, Arc::clone(&pixel_obj));
+
+    idx as i32
+}
+
+/// Get a PixelObject Arc
+pub(crate) fn get_object(idx: i32) -> Option<Arc<PixelObject>> {
+    let lookup = get_object_lookup();
+
+    if let Some(res) = lookup.object_hash.get(&idx) {
+        Some(res.to_owned())
+    } else {
+        None
+    }
+}

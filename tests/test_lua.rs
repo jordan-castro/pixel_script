@@ -82,7 +82,6 @@ mod tests {
         unsafe {
             let args = Var::slice_raw(argv, argc);
 
-            println!("Calling from here");
             // Get ptr
             let pixel_object_var = Var::from_borrow(args[1]);
             let host_ptr = pixel_object_var.get_host_ptr();

@@ -5,7 +5,7 @@ use std::{
 
 use anyhow::{Error, anyhow};
 
-use crate::shared::{PtrMagic, object::get_object_lookup};
+use crate::shared::{PtrMagic, object::get_object};
 
 /// Macro for writing out the Var:: get methods.
 macro_rules! write_func {
@@ -140,8 +140,7 @@ impl Var {
 
     pub fn get_host_ptr(&self) -> *mut c_void {
         // TODO: type checks
-        let object_lookup = get_object_lookup();
-        let object = object_lookup.get_object(self.get_object_ptr()).unwrap();
+        let object = get_object(self.get_object_ptr()).unwrap();
         object.ptr
     }
 

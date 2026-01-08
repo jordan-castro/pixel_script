@@ -9,7 +9,12 @@ fn create_internal_module(vm: &VirtualMachine, module: &Module, parent_path: Opt
     let module_name = match parent_path{
         Some(path) => format!("{}.{}", path, module.name),
         None => module.name.clone(),
-    }  ;
+    };
+
+    m_dict.set_item("__name__", vm.ctx.new_str(module_name.clone()).into(), vm).unwrap();
+    m_dict.set_item("__package__", vm.ctx.none(), vm).unwrap();
+    m_dict.set_item("__loader__", vm.ctx.none(), vm).unwrap();
+    m_dict.set_item("__spec__", vm.ctx.none(), vm).unwrap();
 
     // Variables
     for variable in module.variables.iter() {
@@ -23,13 +28,12 @@ fn create_internal_module(vm: &VirtualMachine, module: &Module, parent_path: Opt
     }
 
     // Inner modules
+    let modules = vm.sys_module.get_attr("modules", vm).expect("Could not get inner sys Modules Python");
     for inner_m in module.modules.iter() {
         let m = create_internal_module(vm, inner_m, Some(&module_name));
         let m_name = format!("{}.{}", module_name, inner_m.name.clone());
         // Set in sys modules
-        let pystr = vm.ctx.new_str(m_name);
-        vm.sys_module.set_attr(&pystr, m.clone(), vm).expect("Could not Add internal Python module.");
-
+        modules.set_item(m_name.as_str(), m.clone(), vm).expect("Could not add internal Python module");
         m_dict.set_item(&inner_m.name, m, vm).expect("Can not define inner module in Python module.");
     }
 
@@ -39,6 +43,6 @@ fn create_internal_module(vm: &VirtualMachine, module: &Module, parent_path: Opt
 /// Create a Python module.
 pub(super) fn create_module(vm: &VirtualMachine, module: Arc<Module>) {
     let m = create_internal_module(vm, module.as_ref(), None);
-    let m_str = vm.ctx.new_str(module.name.clone());
-    vm.sys_module.set_attr(&m_str, m, vm).expect("Could not add Python module");
+    let sys_modules = vm.sys_module.get_attr("modules", vm).expect("Could not get Sys Modules Python.");
+    sys_modules.set_item(&module.name, m, vm).expect("Could not add Python module.");
 }

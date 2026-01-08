@@ -2,7 +2,7 @@ use std::{ffi::c_void, sync::Arc};
 
 use rustpython::vm::{PyObject, PyObjectRef, TryFromObject, convert::ToPyObject};
 
-use crate::{python::object::create_object, shared::{object::get_object_lookup, var::Var}};
+use crate::{python::object::create_object, shared::{object::get_object, var::Var}};
 
 impl ToPyObject for Var {
     fn to_pyobject(self, vm: &rustpython::vm::VirtualMachine) -> rustpython::vm::PyObjectRef {
@@ -44,8 +44,7 @@ impl ToPyObject for Var {
             crate::shared::var::VarType::HostObject => {
                 unsafe {
                     let idx = self.value.host_object_val;
-                    let object_lookup = get_object_lookup();
-                    let pixel_object = object_lookup.get_object(idx).unwrap().clone();
+                    let pixel_object = get_object(idx).unwrap();
                     let lang_ptr_is_null = pixel_object.lang_ptr.lock().unwrap().is_null();
                     if lang_ptr_is_null {
                         // Create the object for the first and mutate the pixel object TODO.

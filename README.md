@@ -34,6 +34,7 @@ And update the `features` flag to include the languages your game/app want.
 | `js`             | JavaScript        | boa                   | Pure Rust                   |
 | `js-quick`       | JavaScript        | rquickjs              | QuickJS, more complete      |
 | `easyjs`         | EasyJS            | Custom                | Requires a JS feature       |
+
 When including `easyjs` make sure to also include a JavaScript feature otherwise it will not work.
 
 ## Building

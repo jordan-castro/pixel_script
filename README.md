@@ -5,7 +5,14 @@ A multi language modding runtime built in Rust.
 PixelScript lets you expose the same API to multiple different languages in your program. Because it compiles to a C library, you can use it anywhere. 
 
 ## Why PixelScript?
+Because most games pick only one language for scripting. PixelScript gives modders and scripters a choice:
 
+- Performance? Go with Lua.
+- Data/science/prototyping? Choose Python.
+- Web developers? You got JavaScript.
+- Love easyjs? You got it!
+
+Each language runtime uses the same PixelScript bindings.
 
 ## Version
 pixelscript crate is currently at version 0.1.0.

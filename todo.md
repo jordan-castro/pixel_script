@@ -41,7 +41,7 @@
 ## Lua
 
 ## Python (RustPython)
-- Remove STDlib
+- Fix UB and HEAP issues.
 - object.call
 
 ## Python (PocketPy)

@@ -48,45 +48,6 @@ macro_rules! with_feature {
     };
 }
 
-/// Convert a borrowed C string (const char *) into a Rust &str.
-macro_rules! borrow_string {
-    ($cstr:expr) => {{
-        if $cstr.is_null() {
-            ""
-        } else {
-            unsafe {
-                let c_str = CStr::from_ptr($cstr);
-                c_str.to_str().unwrap_or("")
-            }
-        }
-    }};
-}
-
-/// Convert a owned C string (i.e. owned by us now.) into a Rust String.
-///
-/// The C memory will be freed automatically, and you get a nice clean String!
-#[macro_export]
-macro_rules! own_string {
-    ($cstr:expr) => {{
-        if $cstr.is_null() {
-            String::new()
-        } else {
-            let owned_string = unsafe { CString::from_raw($cstr) };
-
-            owned_string
-                .into_string()
-                .unwrap_or_else(|_| String::from("Invalid UTF-8"))
-        }
-    }};
-}
-
-/// Create a raw string from &str.
-///
-/// Remember to FREE THIS!
-macro_rules! create_raw_string {
-    ($rstr:expr) => {{ CString::new($rstr).unwrap().into_raw() }};
-}
-
 /// Assert that the module is initiated.
 macro_rules! assert_initiated {
     () => {{
@@ -861,4 +822,26 @@ pub extern "C" fn pixelscript_free_var(var: *mut Var) {
     }
 
     let _ = Var::from_raw(var);
+}
+
+/// Tells PixelScript that we are in a new thread.
+#[unsafe(no_mangle)]
+pub extern "C" fn pixelscript_start_thread() {
+    with_feature!("lua", {
+        LuaScripting::start_thread();
+    });
+    with_feature!("python", {
+        PythonScripting::start_thread();
+    });
+}
+
+/// Tells PixelScript that we just stopped the most recent thread.
+#[unsafe(no_mangle)]
+pub extern "C" fn pixelscritp_stop_thread() {
+    with_feature!("lua", {
+        LuaScripting::stop_thread();
+    });
+    with_feature!("python", {
+        PythonScripting::stop_thread();
+    });
 }

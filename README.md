@@ -25,15 +25,15 @@ cargo add pixelscript
 And update the `features` flag to include the languages your game/app want.
 
 ## Supported languages
-| Feature flag     | Language          | Engine                | Notes                       |
-|------------------|-------------------|-----------------------|-----------------------------|
-| `lua`            | Lua               | mlua                  | Default, fast, battle-tested |
-| `lua-jit`        | LuaJit            | mlua                  | does not work on ios        |
-| `python`         | Python            | rustpython            | Full stdlib (frozen)        |
-| `python-lite`    | Python (light)    | pocketpy              | Smaller binary              |
-| `js`             | JavaScript        | boa                   | Pure Rust                   |
-| `js-quick`       | JavaScript        | rquickjs              | QuickJS, more complete      |
-| `easyjs`         | EasyJS            | Custom                | Requires a JS feature       |
+| Feature flag     | Language          | Engine                | Notes                           |
+|------------------|-------------------|-----------------------|---------------------------------|
+| `lua`            | Lua               | mlua                  | Default, fast, battle-tested    |
+<!-- | `lua-jit`        | LuaJit            | mlua                  | does not work on ios            | -->
+| `python`         | Python            | pocketpy              | Requires MSVC on Windows        |
+<!-- | `python-lite`    | Python (light)    | pocketpy              | Smaller binary                  | -->
+| `js`             | JavaScript        | boa                   | Pure Rust                       |
+| `js-quick`       | JavaScript        | rquickjs              | QuickJS, more complete          |
+| `easyjs`         | EasyJS            | Custom                | Requires a JS feature           |
 
 When including `easyjs` make sure to also include a JavaScript feature otherwise it will not work.
 

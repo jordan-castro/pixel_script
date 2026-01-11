@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use rustpython_vm::{AsObject, Py, PyObjectRef, VirtualMachine, builtins::PyType, function::{FuncArgs, PyMethodFlags}, types::{PyTypeFlags, PyTypeSlots}};
 
-use crate::{python::{get_class_type_from_cache, pystr_leak, store_class_type_in_cache, var::pyobject_to_var, var_to_pyobject}, shared::{PixelScriptRuntime, func::call_function, object::PixelObject, var::Var}};
+use crate::{_python::{get_class_type_from_cache, pystr_leak, store_class_type_in_cache, var::pyobject_to_var, var_to_pyobject}, shared::{PixelScriptRuntime, func::call_function, object::PixelObject, var::Var}};
 
 /// Create object callback methods
 fn create_object_method(vm: &VirtualMachine, fn_name: &str, fn_idx: i32, static_class: &'static Py<PyType>) -> PyObjectRef {

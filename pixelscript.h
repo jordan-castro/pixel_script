@@ -554,4 +554,14 @@ void pixelscript_set_dir_reader(ReadDirFn func);
  */
 void pixelscript_free_var(struct Var *var);
 
+/**
+ * Tells PixelScript that we are in a new thread.
+ */
+void pixelscript_start_thread(void);
+
+/**
+ * Tells PixelScript that we just stopped the most recent thread.
+ */
+void pixelscritp_stop_thread(void);
+
 #endif  /* PIXEL_SCRIPT_H */

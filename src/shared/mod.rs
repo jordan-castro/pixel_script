@@ -4,10 +4,16 @@ use parking_lot::{ReentrantMutex, ReentrantMutexGuard};
 
 use crate::own_string;
 
+/// The internal PixelScript function logic.
 pub mod func;
+/// The internal PixelScript Module structure.
 pub mod module;
+/// The internal PixelScript PixelObject logic.
 pub mod object;
+/// The internal PixelScript Var logic.
 pub mod var;
+/// Helper methods/macros for using PixelScript
+pub mod ffi;
 
 
 // /// Create a *const c_char from a rust &str.
@@ -158,6 +164,10 @@ pub trait PixelScript {
     fn add_module(source: Arc<module::Module>);
     /// Execute a script in this runtime.
     fn execute(code: &str, file_name: &str) -> String;
+    /// Allows the language to start a new thread. In this new thread all callbacks/objects/variables will be empty.
+    fn start_thread();
+    /// Tells the language that we just finished the most recent started thread.
+    fn stop_thread();
 }
 
 /// Public enum for supported runtimes.

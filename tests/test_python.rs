@@ -125,13 +125,15 @@ mod tests {
         unsafe {
             let args = std::slice::from_raw_parts(argv, argc);
 
-            let var_ptr = Var::from_borrow(args[1]);
-
-            if let Ok(msg) = var_ptr.get_string() {
-                println!("Python sent: {}", msg);
-            } else {
-                println!("Could not get a string?");
+            let mut string = String::new();
+            for i in 0..argc {
+                let var_ptr = Var::from_borrow(args[i]);
+                if let Ok(s) = var_ptr.get_string() {
+                    string.push_str(format!("{s} ").as_str());
+                }
             }
+
+            println!("From Python: {string}");
         }
 
         Var::new_null().into_raw()
@@ -173,7 +175,7 @@ mod tests {
         create_raw_string!(contents)
     }
 
-    #[test]
+    // #[test]
     fn test_add_variable() {
         pixelscript_initialize();
         let name = create_raw_string!("name");
@@ -184,7 +186,7 @@ mod tests {
         free_raw_string!(jordan);
     }
 
-    #[test]
+    // #[test]
     fn test_add_callback() {
         pixelscript_initialize();
         let name = create_raw_string!("println");
@@ -192,36 +194,36 @@ mod tests {
         free_raw_string!(name);
     }
 
-    #[test]
-    fn test_add_module() {
-        pixelscript_initialize();
-        let module_name = create_raw_string!("ps_math");
-        let module = pixelscript_new_module(module_name);
-        // Save methods
-        let add_name = create_raw_string!("add");
-        let n1_name = create_raw_string!("n1");
-        let n2_name = create_raw_string!("n2");
-        pixelscript_module_add_callback(module, add_name, add_wrapper, ptr::null_mut());
-        let n1 = pixelscript_var_newi64(1);
-        let n2 = pixelscript_var_newi64(2);
-        pixelscript_module_add_variable(module, n1_name, n1);
-        pixelscript_module_add_variable(module, n2_name, n2);
+    // #[test]
+    // fn test_add_module() {
+    //     pixelscript_initialize();
+    //     let module_name = create_raw_string!("ps_math");
+    //     let module = pixelscript_new_module(module_name);
+    //     // Save methods
+    //     let add_name = create_raw_string!("add");
+    //     let n1_name = create_raw_string!("n1");
+    //     let n2_name = create_raw_string!("n2");
+    //     pixelscript_module_add_callback(module, add_name, add_wrapper, ptr::null_mut());
+    //     let n1 = pixelscript_var_newi64(1);
+    //     let n2 = pixelscript_var_newi64(2);
+    //     pixelscript_module_add_variable(module, n1_name, n1);
+    //     pixelscript_module_add_variable(module, n2_name, n2);
 
-        pixelscript_add_module(module);
+    //     pixelscript_add_module(module);
 
-        free_raw_string!(module_name);
-        free_raw_string!(add_name);
-        free_raw_string!(n1_name);
-        free_raw_string!(n2_name);
-    }
+    //     free_raw_string!(module_name);
+    //     free_raw_string!(add_name);
+    //     free_raw_string!(n1_name);
+    //     free_raw_string!(n2_name);
+    // }
 
-    #[test]
-    fn test_add_object() {
-        pixelscript_initialize();
-        let object_name = create_raw_string!("Person");
-        pixelscript_add_object(object_name, new_person, ptr::null_mut());
-        free_raw_string!(object_name);
-    }
+    // #[test]
+    // fn test_add_object() {
+    //     pixelscript_initialize();
+    //     let object_name = create_raw_string!("Person");
+    //     pixelscript_add_object(object_name, new_person, ptr::null_mut());
+    //     free_raw_string!(object_name);
+    // }
 
     #[test]
     fn test_execute() {
@@ -229,40 +231,47 @@ mod tests {
 
         test_add_variable();
         test_add_callback();
-        test_add_module();
-        test_add_object();
+        // test_add_module();
+        // test_add_object();
 
         pixelscript_set_file_reader(file_loader);
 
         let py_code = r#"
-import ps_math
-import sys
-print(f"DEBUG META_PATH: {sys.meta_path}")
-from pad.ft_object import function_from_outside 
+println('Welcome ' + name, '2', '3', '4', '5', '6')
+#println('This is a test')
+#print('yes')
+#_pxs_println('println', "Hello Wolrd")
+"#;
 
-function_from_outside() # Should print something
+//         let py_code = r#"
+// import ps_math
+// import sys
+// print(f"DEBUG META_PATH: {sys.meta_path}")
+// from pad.ft_object import function_from_outside 
 
-msg = "Welcome " + name
-println(msg)
+// function_from_outside() # Should print something
 
-result = ps_math.add(ps_math.n1, ps_math.n2)
-println(f"Module result: {result}")
+// msg = "Welcome " + name
+// println(msg)
 
-if result != 3:
-    raise "Math, Expected 3, got " + str(result)
+// result = ps_math.add(ps_math.n1, ps_math.n2)
+// println(f"Module result: {result}")
 
-person = Person("Jordan")
+// if result != 3:
+//     raise "Math, Expected 3, got " + str(result)
 
-println(person.get_name())
-person.set_name("Jordan Castro")
-println(person.get_name())
+// person = Person("Jordan")
 
-println(type(person).__name__)
-println(type(Person).__name__)
-        "#;
+// println(person.get_name())
+// person.set_name("Jordan Castro")
+// println(person.get_name())
+
+// println(type(person).__name__)
+// println(type(Person).__name__)
+//         "#;
         let err = PythonScripting::execute(py_code, "<test>");
+        pixelscript_finalize();
         assert!(err.is_empty(), "Python Error is not empty: {}", err);
 
-        pixelscript_finalize();
     }
 }

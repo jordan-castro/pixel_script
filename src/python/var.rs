@@ -1,110 +1,118 @@
-use std::{ffi::c_void, sync::Arc};
+use std::ffi::c_void;
 
-use rustpython_vm::{PyObject, PyObjectRef, PyResult, VirtualMachine};
+use crate::{borrow_string, create_raw_string, free_raw_string, python::pocketpy, shared::{object::get_object, var::{Var, VarType}}};
 
-use crate::{python::object::create_object, shared::{object::get_object, var::Var}};
+/// Convert a PocketPy ref into a Var
+pub(super) fn pocketpyref_to_var(pref: pocketpy::py_Ref) -> Var {
+    let tp = unsafe { pocketpy::py_typeof(pref) };
+    match tp as i32 {
+        pocketpy::py_PredefinedType_tp_int => {
+            let val: i64 = unsafe { pocketpy::py_toint(pref) };
+            Var::new_i64(val)
+        },
+        pocketpy::py_PredefinedType_tp_float => {
+            let val = unsafe { pocketpy::py_tofloat(pref) };
+            Var::new_f64(val)
+        },
+        pocketpy::py_PredefinedType_tp_bool => {
+            let val = unsafe { pocketpy::py_tobool(pref) };
+            Var::new_bool(val)
+        },
+        pocketpy::py_PredefinedType_tp_str => {
+            let cstr_ptr = unsafe { pocketpy::py_tostr(pref) };
+            let r_str = borrow_string!(cstr_ptr).to_string();
 
-/// Convert Var to PyObjectRef
-pub(super) fn var_to_pyobject(vm: &VirtualMachine, var: &Var) -> PyObjectRef {
-    match var.tag {
-            crate::shared::var::VarType::Int32 => {
-                vm.ctx.new_int(var.get_i32().unwrap()).into()
+            Var::new_string(r_str)
+        },
+        pocketpy::py_PredefinedType_tp_NoneType => {
+            Var::new_null()
+        }
+        _ => {
+            // Just save the pointer
+            Var::new_object(pref as *mut c_void)
+        }
+    }
+    // if pocketpy::py_istype(pref, pocketpy::py)
+}
+
+/// Convert a Var into a PocketPy ref
+pub(super) fn var_to_pocketpyref(out: pocketpy::py_Ref, var: &Var) {
+    unsafe {
+        match var.tag {
+            VarType::Int32 | VarType::Int64 | VarType::UInt32 | VarType::UInt64 => {
+                pocketpy::py_newint(out, var.get_bigint());
             },
-            crate::shared::var::VarType::Int64 => {
-                vm.ctx.new_int(var.get_i64().unwrap()).into()
-            },
-            crate::shared::var::VarType::UInt32 => {
-                vm.ctx.new_int(var.get_u32().unwrap()).into()
-            },
-            crate::shared::var::VarType::UInt64 => {
-                vm.ctx.new_int(var.get_u64().unwrap()).into()
-            },
-            crate::shared::var::VarType::String => {
-                let contents = var.get_string().expect("Could not get String.");
-                vm.ctx.new_str(contents).into()
+            VarType::Float64 | VarType::Float32 => {
+                pocketpy::py_newfloat(out, var.get_bigfloat());
             },
             crate::shared::var::VarType::Bool => {
-                vm.ctx.new_bool(var.get_bool().unwrap()).into()
+                pocketpy::py_newbool(out, var.get_bool().unwrap());
             },
-            crate::shared::var::VarType::Float32 => {
-                vm.ctx.new_float(var.get_bigfloat()).into()
+            crate::shared::var::VarType::String => {
+                let s = var.get_string().unwrap();
+                let c_str = create_raw_string!(s);
+                pocketpy::py_newstr(out, c_str);
+                // Free raw string
+                free_raw_string!(c_str);
             },
-            crate::shared::var::VarType::Float64 => {
-                vm.ctx.new_float(var.get_bigfloat()).into()
+            crate::shared::var::VarType::Null => {
+                pocketpy::py_newnone(out);
             },
-            crate::shared::var::VarType::Null => vm.ctx.none(),
             crate::shared::var::VarType::Object => {
-                unsafe {
-                    if var.value.object_val.is_null() {
-                        return vm.ctx.none();
-                    }
-                    // This is a Python Class
-                    let pyobj_ptr = var.value.object_val as *const PyObject;
-
-                    PyObjectRef::from_raw(pyobj_ptr)
+                if var.value.object_val.is_null() {
+                    pocketpy::py_newnone(out);
+                } else {
+                    // This is a Python object that already exists, just that it's pointer was passed around.
+                    let ptr = var.value.object_val as pocketpy::py_Ref;
+                    // UNSAFE UNSAFE UNSAFE UNSAFE!!!!
+                    *out = *ptr;
                 }
             },
             crate::shared::var::VarType::HostObject => {
-                unsafe {
-                    let idx = var.value.host_object_val;
-                    let pixel_object = get_object(idx).unwrap();
-                    let lang_ptr_is_null = pixel_object.lang_ptr.lock().unwrap().is_null();
-                    if lang_ptr_is_null {
-                        // Create the object for the first and mutate the pixel object TODO.
-                        let pyobj = create_object(vm, idx, Arc::clone(&pixel_object));
-                        // Set pointer
-                        pixel_object.update_lang_ptr(pyobj.into_raw() as *mut c_void);
-                    }
-
-                    // Get PTR again
-                    let lang_ptr = pixel_object.lang_ptr.lock().unwrap();
-                    // Get as PyObject and grab dict
-                    let pyobj_ptr = *lang_ptr as *const PyObject;
-
-                    PyObjectRef::from_raw(pyobj_ptr)
+                let idx = var.value.host_object_val;
+                let pixel_object = get_object(idx).unwrap();
+                let lang_ptr_is_null = pixel_object.lang_ptr.lock().unwrap().is_null();
+                if lang_ptr_is_null {
+                    // TODO: Create the object for the first time...
                 }
+                // Get PTR again
+                let lang_ptr = pixel_object.lang_ptr.lock().unwrap();
+                // Assign again
+                *out = *(*lang_ptr as pocketpy::py_Ref);
             },
         }
+    }
 }
 
-/// Convert a PyObjectRef into a Var
-pub(super) fn pyobject_to_var(vm: &VirtualMachine, obj: PyObjectRef) -> PyResult<Var> {
-        // Null
-        if vm.is_none(&obj) {
-            return Ok(Var::new_null());
-        }
+// RUST PYTHON OLD VERSION
+            // crate::shared::var::VarType::Object => {
+            //     unsafe {
+            //         if var.value.object_val.is_null() {
+            //             return vm.ctx.none();
+            //         }
+            //         // This is a Python Class
+            //         let pyobj_ptr = var.value.object_val as *const PyObject;
 
-        // Bool
-        if obj.is_instance(vm.ctx.types.bool_type.into(), vm)? {
-            let val = obj.try_to_bool(vm)?;
-            return Ok(Var::new_bool(val));
-        }
+            //         PyObjectRef::from_raw(pyobj_ptr)
+            //     }
+            // },
+            // crate::shared::var::VarType::HostObject => {
+            //     unsafe {
+            //         let idx = var.value.host_object_val;
+            //         let pixel_object = get_object(idx).unwrap();
+            //         let lang_ptr_is_null = pixel_object.lang_ptr.lock().unwrap().is_null();
+            //         if lang_ptr_is_null {
+            //             // Create the object for the first and mutate the pixel object TODO.
+            //             let pyobj = create_object(vm, idx, Arc::clone(&pixel_object));
+            //             // Set pointer
+            //             pixel_object.update_lang_ptr(pyobj.into_raw() as *mut c_void);
+            //         }
 
-        // Int, might have to wrap this in a Var::Object
-        if obj.is_instance(vm.ctx.types.int_type.into(), vm)? {
-            let val = obj.try_to_value::<i64>(vm)?;
-            return Ok(Var::new_i64(val));
-        }
+            //         // Get PTR again
+            //         let lang_ptr = pixel_object.lang_ptr.lock().unwrap();
+            //         // Get as PyObject and grab dict
+            //         let pyobj_ptr = *lang_ptr as *const PyObject;
 
-        // Float
-        if obj.is_instance(vm.ctx.types.float_type.into(), vm)? {
-            let pyref = obj.try_float(vm)?;
-            let val = pyref.to_f64();
-
-            return Ok(Var::new_f64(val));
-        }
-
-        // String
-        if obj.is_instance(vm.ctx.types.str_type.into(), vm)? {
-            let pyref = obj.str(vm)?;
-            let val = pyref.as_str();
-
-            return Ok(Var::new_string(val.to_string()));
-        }
-
-        // Generic Python object
-
-        // Get the ptr to pyobject
-        let ptr = PyObjectRef::into_raw(obj);
-        Ok(Var::new_object(ptr as *mut c_void))
-} 
+            //         PyObjectRef::from_raw(pyobj_ptr)
+            //     }
+            // },

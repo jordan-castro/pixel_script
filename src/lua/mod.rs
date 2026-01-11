@@ -141,7 +141,14 @@ impl PixelScript for LuaScripting {
         state.engine.gc_collect().unwrap();
         state.engine.gc_collect().unwrap();
     }
-
+    
+    fn start_thread() {
+        // LUA does not need this.
+    }
+    
+    fn stop_thread() {
+        // LUA does not need this.
+    }
 }
 
 impl ObjectMethods for LuaScripting {

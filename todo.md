@@ -40,9 +40,8 @@
 
 ## Lua
 
-## Python (RustPython)
-- Fix UB and HEAP issues.
-- object.call
+## Python (rustpython)
+- Eventually look back at this
 
 ## Python (PocketPy)
 - Write bindings in build.rs

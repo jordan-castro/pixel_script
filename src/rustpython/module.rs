@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use rustpython_vm::{PyObjectRef, VirtualMachine};
 
-use crate::{python::{create_function, var_to_pyobject}, shared::{PtrMagic, module::Module, var::Var}};
+use crate::{_python::{create_function, var_to_pyobject}, shared::{PtrMagic, module::Module, var::Var}};
 
 fn create_internal_module(vm: &VirtualMachine, module: &Module, parent_path: Option<&str>) -> PyObjectRef {
     let m_dict = vm.ctx.new_dict();

@@ -123,13 +123,14 @@ fn init_state() -> State {
     settings.path_list.push("".to_string());
     settings.write_bytecode = false;
 
-    let interp = Interpreter::without_stdlib(settings);
+    let interp = Interpreter::with_init(settings, |vm| {
+        add_bundled_stdlib(vm);
+        override_import_loader(vm);
+    });
+    // let interp = Interpreter::without_stdlib(settings);
 
     let scope = interp.enter(|vm| {
         let globals = vm.ctx.new_dict();
-        add_bundled_stdlib(vm);
-        override_import_loader(vm);
-
         // let sys_modules = vm.sys_module.get_attr("modules", vm).unwrap();
 
         // let modules_dict = sys_modules.downcast::<rustpython::vm::builtins::PyDict>().unwrap();

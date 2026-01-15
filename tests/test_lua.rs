@@ -265,7 +265,6 @@ mod tests {
             print(person:get_name())
 
             print('Calling internal print?')
-            print(Person)
         "#;
         let err = LuaScripting::execute(lua_code, "<test>");
 

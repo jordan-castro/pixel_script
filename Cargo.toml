@@ -30,6 +30,7 @@ python = []
 # Include Python scripting. via rustpython
 # rustpython = ["dep:rustpython-vm", "dep:rustpython-compiler"]
 
+include-core = []
 all = ["lua", "python"]
 
 [profile.release]

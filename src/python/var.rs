@@ -1,6 +1,6 @@
 use std::{ffi::c_void, sync::Arc};
 
-use crate::{borrow_string, create_raw_string, free_raw_string, python::{object::create_object, pocketpy}, shared::{object::get_object, var::{Var, VarType}}};
+use crate::{borrow_string, create_raw_string, free_raw_string, python::{func::py_assign, object::create_object, pocketpy}, shared::{object::get_object, var::{Var, VarType}}};
 
 /// Convert a PocketPy ref into a Var
 pub(super) fn pocketpyref_to_var(pref: pocketpy::py_Ref) -> Var {
@@ -64,8 +64,8 @@ pub(super) fn var_to_pocketpyref(out: pocketpy::py_Ref, var: &Var) {
                 } else {
                     // This is a Python object that already exists, just that it's pointer was passed around.
                     let ptr = var.value.object_val as pocketpy::py_Ref;
+                    py_assign(out, ptr);
                     // UNSAFE UNSAFE UNSAFE UNSAFE!!!!
-                    *out = *ptr;
                 }
             },
             crate::shared::var::VarType::HostObject => {

@@ -155,7 +155,7 @@ impl ObjectMethods for LuaScripting {
     fn object_call(
         var: &crate::shared::var::Var,
         method: &str,
-        args: Vec<crate::shared::var::Var>,
+        args: &Vec<crate::shared::var::Var>,
     ) -> Result<crate::shared::var::Var, anyhow::Error> {
         // Get the lua table.
         let table = unsafe {

@@ -443,5 +443,5 @@ impl Clone for Var {
 
 pub trait ObjectMethods {
     /// Call a method on a object.
-    fn object_call(var: &Var, method: &str, args: Vec<Var>) -> Result<Var, Error>;
+    fn object_call(var: &Var, method: &str, args: &Vec<Var>) -> Result<Var, Error>;
 }

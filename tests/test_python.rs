@@ -260,11 +260,10 @@ mod tests {
 
         let py_code = r#"
 import ps_math
-#import sys
-#print(f"DEBUG META_PATH: {sys.meta_path}")
-#from pad.ft_object import function_from_outside 
+import sys
+from pad.ft_object import function_from_outside 
 
-#function_from_outside() # Should print something
+function_from_outside() # Should print something
 
 msg = "Welcome " + name
 println(msg)

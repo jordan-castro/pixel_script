@@ -4,8 +4,8 @@ use parking_lot::{ReentrantMutex, ReentrantMutexGuard};
 
 use crate::{
     create_raw_string, free_raw_string, own_string,
-    python::{func::pocketpy_bridge, module::create_module, var::var_to_pocketpyref},
-    shared::PixelScript,
+    python::{func::{pocketpy_bridge, virtual_module_loader}, module::create_module, var::{pocketpyref_to_var, var_to_pocketpyref}},
+    shared::{PixelScript, var::{ObjectMethods, Var}},
 };
 
 // Allow for the binidngs only
@@ -175,15 +175,34 @@ pub(self) fn make_private(name: &str) -> String {
     format!("_pxs_{}", name)
 }
 
+/// This needs to be called in every PKPY VM.
+unsafe fn setup_module_loader() {
+    unsafe {
+        //             pocketpy::py_bindfunc(global_scope, c_name, Some(pocketpy_bridge));
+        let main_name = create_raw_string!("__main__");
+        let func_name = create_raw_string!("__import__");
+        let main = pocketpy::py_getmodule(main_name);
+        pocketpy::py_bindfunc(main, func_name, Some(virtual_module_loader));
+
+        free_raw_string!(main_name);
+        free_raw_string!(func_name);
+    }
+}
+
 pub struct PythonScripting;
 
 impl PixelScript for PythonScripting {
     fn start() {
         // py initialize here
+        // let pxs_globals: pocketpy::py_Ref;
         unsafe {
             pocketpy::py_initialize();
+            // Create _pxs_globals
+            // let pxs_name = create_raw_string!("_pxs_globals");
+            // pxs_globals = pocketpy::py_newmodule(pxs_name);
+            setup_module_loader();
         }
-        let _s = exec_main_py("1 + 1", "<init>");
+        // let _s = exec_main_py("1 + 1", "<init>");
         let _state = get_py_state();
     }
 
@@ -249,6 +268,7 @@ def {name}(*args):
         unsafe {
             let idx = pocketpy::py_currentvm() + 1;
             pocketpy::py_switchvm(idx);
+            setup_module_loader();
             let state = get_py_state();
             *(state.thread_idx.borrow_mut()) = idx;
         }
@@ -262,5 +282,36 @@ def {name}(*args):
             let state = get_py_state();
             *(state.thread_idx.borrow_mut()) = idx;
         }
+    }
+}
+
+impl ObjectMethods for PythonScripting {
+    fn object_call(var: &crate::shared::var::Var, method: &str, args: &Vec<crate::shared::var::Var>) -> Result<crate::shared::var::Var, anyhow::Error> {
+        // Get the pyref
+        let pyref = unsafe { pocketpy::py_getreg(0) };
+        var_to_pocketpyref(pyref, var);
+
+        let method_name = create_raw_string!(method);
+        // Call a method on it.
+        unsafe {
+            let pymethod_name = pocketpy::py_name(method_name);
+            pocketpy::py_getattr(pyref, pymethod_name);
+            // Get the result pushed to the stack.
+            let pymethod = pocketpy::py_getreg(0);
+
+            // Convert args into py_Ref
+            for i in 0..args.len() {
+                let pyref = pocketpy::py_getreg((i + 1) as i32);
+                var_to_pocketpyref(pyref, &args[i]);
+                pocketpy::py_push(pyref);
+            }
+
+            // Now call
+            pocketpy::py_call(pymethod, args.len() as i32, std::ptr::null_mut());
+        }
+
+        // Result is py_retval
+        let result = unsafe { pocketpy::py_retval() };
+        Ok(pocketpyref_to_var(result))
     }
 }

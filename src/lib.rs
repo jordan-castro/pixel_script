@@ -24,6 +24,8 @@ pub mod shared;
 pub mod lua;
 #[cfg(feature = "python")]
 pub mod python;
+#[cfg(feature = "include-core")]
+pub mod core;
 
 
 /// Macro to wrap features
@@ -624,15 +626,14 @@ pub extern "C" fn pixelscript_object_call(runtime: *mut Var, var: *mut Var, meth
     let var: Result<Var, anyhow::Error> = match runtime {
         PixelScriptRuntime::Lua => {
             with_feature!("lua", {
-                LuaScripting::object_call(var_borrow, method_borrow, args)
+                LuaScripting::object_call(var_borrow, method_borrow, &args)
             }, {
                 Ok(Var::new_null())
-                // Result::Err(anyhow!("TODO"))
             })
         },
         PixelScriptRuntime::Python => {
             with_feature!("python", {
-                Ok(Var::new_null())
+                PythonScripting::object_call(var_borrow, method_borrow, &args)
             }, {
                 Ok(Var::new_null())
             })
@@ -786,7 +787,6 @@ pub extern "C" fn pixelscript_var_is(var: *mut Var, var_type: VarType) -> bool {
 
     var_borrow.tag == var_type
 }
-
 
 /// Set a function for reading a file.
 ///

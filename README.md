@@ -27,16 +27,84 @@ And update the `features` flag to include the languages your game/app want.
 ## Supported languages
 | Feature flag     | Language          | Engine                | Notes                           |
 |------------------|-------------------|-----------------------|---------------------------------|
-| `lua`            | Lua               | mlua                  | Default, fast, battle-tested    |
-<!-- | `lua-jit`        | LuaJit            | mlua                  | does not work on ios            | -->
+| `lua`            | Lua               | mlua                  | Fast, battle-tested, v5.4       |
 | `python`         | Python            | pocketpy              | Requires MSVC on Windows        |
-<!-- | `python-lite`    | Python (light)    | pocketpy              | Smaller binary                  | -->
-| `js`             | JavaScript        | boa                   | Pure Rust                       |
-| `js-quick`       | JavaScript        | rquickjs              | QuickJS, more complete          |
+| `js`             | JavaScript        | rquickjs              | Quickjs, C library              |
 | `easyjs`         | EasyJS            | Custom                | Requires a JS feature           |
+| `rustpython`     | Python (CPython compatible)    | rustpython              | Larger binary, Full Python library support, currently leaking memory.                  |
+| `lua-jit`        | LuaJit            | mlua                  | does not work on ios, v5.4      |
+<!-- | `js-quick`       | JavaScript        | rquickjs              | QuickJS, more complete          | -->
 
 When including `easyjs` make sure to also include a JavaScript feature otherwise it will not work.
 
+## CoreLib
+To include the PixelScript core API, add the `include-core` feature.
+| Module name | Module purpose | Languages Type | Notes |
+|-------------|----------------|-------------------|-------|
+| `ps_json`   | Adds JSON encoding, decoding, and .* properties. | Lua(Tree), Python(object), JS(Prototype), easyjs(struct) | Requires a loader function. Set via `pixelscript_set_file_reader` and a writer function via `pixelscript_set_file_writer` |
+
+<!-- ### Examples
+`ps_json` In lua
+```lua
+local json = require('ps_json')
+local data = json.load('path/to/json.json')
+
+-- Now you can read the data
+local name = data.name
+-- Assuming you have a print wrapper
+print(name)
+-- Set data
+data.name.set("Dude")
+-- Set internal
+data.fullname.last.set("New")
+print(data.fullname)
+```
+In Python
+```python
+import ps_json as json
+data = json.load('path/to/json.json')
+
+# Read
+name = data.name
+# Or via dict
+name = data['name']
+print(name)
+
+data.name.set('Dude')
+# Or dict
+data['name'] = 'Dude'
+# Internal
+data.fullname.last.set('New')
+print(data.fullname)
+```
+In JS
+```js
+import * as ps_json from "ps_json";
+
+let data = ps_json.load('path/to/json.json');
+// Read
+let name = data.name;
+print(name);
+
+data.name.set('Dude');
+data['name'] = 'Dude'; // Also works in JS
+
+data.fullname.last.set('New');
+print(data.fullname);
+```
+In easyjs
+```easyjs
+import 'ps_json'
+data = ps_json.load('path/to/json.json');
+
+print(data.name)
+print(data['name'])
+
+data.name.set('Dude')
+data.fullname.last.set('New')
+print(data.fullname)
+```
+ -->
 ## Building
 In order to use pixelscript, you need to first compile it's libraries. Each language could potentially have it's own libraries.
 Each library will be fetched and placed under a pixel_script folder in the main directory of your build system.

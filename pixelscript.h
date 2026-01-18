@@ -12,13 +12,10 @@
  * This represents the variable type that is being read or created.
  */
 enum VarType {
-  Int32,
   Int64,
-  UInt32,
   UInt64,
   String,
   Bool,
-  Float32,
   Float64,
   /**
    * Lua (nil), Python (None), JS/easyjs (null)
@@ -146,13 +143,10 @@ typedef struct PixelObject PixelObject;
  * The Variables actual value union.
  */
 typedef union VarValue {
-  int32_t i32_val;
   int64_t i64_val;
-  uint32_t u32_val;
   uint64_t u64_val;
   char *string_val;
   bool bool_val;
-  float f32_val;
   double f64_val;
   const void *null_val;
   void *object_val;
@@ -391,24 +385,14 @@ struct Var *pixelscript_var_newnull(void);
 struct Var *pixelscript_var_newhost_object(struct PixelObject *pixel_object);
 
 /**
- * Create a new variable i32.
+ * Create a new variable int. (i64)
  */
-struct Var *pixelscript_var_newi32(int32_t val);
+struct Var *pixelscript_var_newint(int64_t val);
 
 /**
- * Create a new variable u32.
+ * Create a new variable uint. (u64)
  */
-struct Var *pixelscript_var_newu32(uint32_t val);
-
-/**
- * Create a new variable i64.
- */
-struct Var *pixelscript_var_newi64(int64_t val);
-
-/**
- * Create a new variable u64.
- */
-struct Var *pixelscript_var_newu64(uint64_t val);
+struct Var *pixelscript_var_newuint(uint64_t val);
 
 /**
  * Create a new variable bool.
@@ -416,14 +400,9 @@ struct Var *pixelscript_var_newu64(uint64_t val);
 struct Var *pixelscript_var_newbool(bool val);
 
 /**
- * Create a new variable f32.
+ * Create a new variable float. (f64)
  */
-struct Var *pixelscript_var_newf32(float val);
-
-/**
- * Create a new variable f64
- */
-struct Var *pixelscript_var_newf64(double val);
+struct Var *pixelscript_var_newfloat(double val);
 
 struct Var *pixelscript_object_call_rt(enum PixelScriptRuntime runtime,
                                        struct Var *var,
@@ -434,7 +413,7 @@ struct Var *pixelscript_object_call_rt(enum PixelScriptRuntime runtime,
 /**
  * Object call.
  *
- * All memory is borrowed.
+ * All memory is borrowed. But the var returned need to be freed on host side if not returned by a function.
  *
  * You can get the runtime from the first Var in any callback.
  *
@@ -452,34 +431,19 @@ struct Var *pixelscript_object_call(struct Var *runtime,
                                     struct Var **argv);
 
 /**
- * Get a I32 from a var.
+ * Get a int (i64) from a var.
  */
-int32_t pixelscript_var_get_i32(struct Var *var);
+int64_t pixelscript_var_get_int(struct Var *var);
 
 /**
- * Get a I64 from a var.
+ * Get a uint (u64)
  */
-int64_t pixelscript_var_get_i64(struct Var *var);
+uint64_t pixelscript_var_get_uint(struct Var *var);
 
 /**
- * Get a U32 from a var.
+ * Get a float (f64)
  */
-uint32_t pixelscript_var_get_u32(struct Var *var);
-
-/**
- * Get a U64
- */
-uint64_t pixelscript_var_get_u64(struct Var *var);
-
-/**
- * Get a F32
- */
-float pixelscript_var_get_f32(struct Var *var);
-
-/**
- * Get a F64
- */
-double pixelscript_var_get_f64(struct Var *var);
+double pixelscript_var_get_float(struct Var *var);
 
 /**
  * Get a Bool
@@ -549,5 +513,12 @@ void pixelscript_start_thread(void);
  * Tells PixelScript that we just stopped the most recent thread.
  */
 void pixelscript_stop_thread(void);
+
+/**
+ * Call a ToString method on this Var. If already a string, it won't call it.
+ *
+ * Host must free this memory with `pixelscript_free_var`
+ */
+struct Var *pixelscript_var_tostring(struct Var *runtime, struct Var *var);
 
 #endif  /* PIXEL_SCRIPT_H */

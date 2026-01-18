@@ -147,7 +147,7 @@ impl ObjectMethods for LuaScripting {
     fn object_call(
         var: &crate::shared::var::Var,
         method: &str,
-        args: &Vec<crate::shared::var::Var>,
+        args: &Vec<&mut crate::shared::var::Var>,
     ) -> Result<crate::shared::var::Var, anyhow::Error> {
         // Get the lua table.
         let table = unsafe {
@@ -183,5 +183,19 @@ impl ObjectMethods for LuaScripting {
 
         Ok(pixel_res)
         // Drop state
+    }
+    
+    fn call_method(method: &str, args: &Vec<&mut crate::shared::var::Var>) -> Result<crate::shared::var::Var, anyhow::Error> {
+        // Get args as lua args
+        let mut lua_args = vec![];
+        let state = get_lua_state();
+        for arg in args.iter() {
+            lua_args.push(into_lua(&state.engine, arg).expect("Could not convert Var into Lua Var."));
+        }
+
+        let function: LuaFunction = state.engine.globals().get(method)?;
+        let res: LuaValue = function.call(lua_args).expect(format!("Could not call {method}").as_str());
+
+        from_lua(res)
     }
 }

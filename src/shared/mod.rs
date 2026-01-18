@@ -14,7 +14,7 @@ use std::{
 
 use parking_lot::{ReentrantMutex, ReentrantMutexGuard};
 
-use crate::own_string;
+use crate::{own_string, shared::var::Var};
 
 /// Helper methods/macros for using PixelScript
 pub mod ffi;
@@ -213,13 +213,24 @@ pub enum PixelScriptRuntime {
 }
 
 impl PixelScriptRuntime {
-    pub fn from_i32(val: i32) -> Option<Self> {
+    ///
+    pub fn from_i64(val: i64) -> Option<Self> {
         match val {
             0 => Some(Self::Lua),
             1 => Some(Self::Python),
             2 => Some(Self::JavaScript),
             3 => Some(Self::Easyjs),
             _ => None, // Handle invalid integers from C safely
+        }
+    }
+
+    pub unsafe fn from_var_ptr(var: *mut Var) -> Option<Self> {
+        let borrow = unsafe { Var::from_borrow(var) };
+        let int_val = borrow.get_i64();
+        if let Ok(int_val) = int_val {
+            Self::from_i64(int_val)
+        } else {
+            None
         }
     }
 }

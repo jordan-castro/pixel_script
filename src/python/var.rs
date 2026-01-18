@@ -40,11 +40,14 @@ pub(super) fn pocketpyref_to_var(pref: pocketpy::py_Ref) -> Var {
 pub(super) fn var_to_pocketpyref(out: pocketpy::py_Ref, var: &Var) {
     unsafe {
         match var.tag {
-            VarType::Int32 | VarType::Int64 | VarType::UInt32 | VarType::UInt64 => {
-                pocketpy::py_newint(out, var.get_bigint());
+            VarType::Int64 => {
+                pocketpy::py_newint(out, var.get_i64().unwrap());
             },
-            VarType::Float64 | VarType::Float32 => {
-                pocketpy::py_newfloat(out, var.get_bigfloat());
+            VarType::UInt64 => {
+                pocketpy::py_newint(out, var.get_u64().unwrap() as i64)
+            },
+            VarType::Float64 => {
+                pocketpy::py_newfloat(out, var.get_f64().unwrap());
             },
             crate::shared::var::VarType::Bool => {
                 pocketpy::py_newbool(out, var.get_bool().unwrap());

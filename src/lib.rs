@@ -461,24 +461,14 @@ pub extern "C" fn pixelscript_var_newhost_object(pixel_object: *mut PixelObject)
     Var::new_host_object(idx).into_raw()
 }
 
-/// Create a new variable i32.
+/// Create a new variable int. (i64)
 #[unsafe(no_mangle)]
-pub extern "C" fn pixelscript_var_newi32(val: i32) -> *mut Var {
-    Var::new_i32(val).into_raw()
-}
-/// Create a new variable u32.
-#[unsafe(no_mangle)]
-pub extern "C" fn pixelscript_var_newu32(val: u32) -> *mut Var {
-    Var::new_u32(val).into_raw()
-}
-/// Create a new variable i64.
-#[unsafe(no_mangle)]
-pub extern "C" fn pixelscript_var_newi64(val: i64) -> *mut Var {
+pub extern "C" fn pixelscript_var_newint(val: i64) -> *mut Var {
     Var::new_i64(val).into_raw()
 }
-/// Create a new variable u64.
+/// Create a new variable uint. (u64)
 #[unsafe(no_mangle)]
-pub extern "C" fn pixelscript_var_newu64(val: u64) -> *mut Var {
+pub extern "C" fn pixelscript_var_newuint(val: u64) -> *mut Var {
     Var::new_u64(val).into_raw()
 }
 /// Create a new variable bool.
@@ -486,15 +476,10 @@ pub extern "C" fn pixelscript_var_newu64(val: u64) -> *mut Var {
 pub extern "C" fn pixelscript_var_newbool(val: bool) -> *mut Var {
     Var::new_bool(val).into_raw()
 }
-/// Create a new variable f32.
-#[unsafe(no_mangle)]
-pub extern "C" fn pixelscript_var_newf32(val: f32) -> *mut Var {
-    Var::new_f32(val).into_raw()
-}
 
-/// Create a new variable f64
+/// Create a new variable float. (f64)
 #[unsafe(no_mangle)]
-pub extern "C" fn pixelscript_var_newf64(val: f64) -> *mut Var {
+pub extern "C" fn pixelscript_var_newfloat(val: f64) -> *mut Var {
     Var::new_f64(val).into_raw()
 }
 
@@ -517,7 +502,7 @@ pub extern "C" fn pixelscript_object_call_rt(
 
 /// Object call.
 ///
-/// All memory is borrowed.
+/// All memory is borrowed. But the var returned need to be freed on host side if not returned by a function.
 ///
 /// You can get the runtime from the first Var in any callback.
 ///
@@ -546,11 +531,12 @@ pub extern "C" fn pixelscript_object_call(
     let var_borrow = unsafe { Var::from_borrow(var) };
     let method_borrow = borrow_string!(method);
     let argv_borrow: &[*mut Var] = unsafe { Var::slice_raw(argv, argc) };
-    let args: Vec<Var> = argv_borrow
+    let mut owned_args: Vec<Var> = argv_borrow
         .iter()
-        .filter(|ptr| !ptr.is_null()) // Always check for nulls from C
-        .map(|&ptr| (unsafe { (*ptr).clone() }).clone()) // Dereference and clone
+        .filter(|ptr| !ptr.is_null())
+        .map(|&ptr| unsafe { (*ptr).clone() })
         .collect();
+    let args: Vec<&mut Var> = owned_args.iter_mut().collect();
 
     // Check that runtime is acually a int
     let runtime = runtime_borrow.get_i64();
@@ -558,7 +544,7 @@ pub extern "C" fn pixelscript_object_call(
         return Var::new_null().into_raw();
     }
 
-    let runtime = PixelScriptRuntime::from_i32(runtime.unwrap() as i32);
+    let runtime = PixelScriptRuntime::from_i64(runtime.unwrap());
     if runtime.is_none() {
         return Var::new_null().into_raw();
     }
@@ -568,10 +554,8 @@ pub extern "C" fn pixelscript_object_call(
     let tags = vec![
         VarType::Object,
         VarType::HostObject,
-        VarType::Int32,
         VarType::Int64,
         VarType::UInt64,
-        VarType::UInt32,
     ];
     if !tags.contains(&var_borrow.tag) {
         return Var::new_null().into_raw();
@@ -604,66 +588,64 @@ pub extern "C" fn pixelscript_object_call(
     }
 }
 
-/// Get a I32 from a var.
+/// Get a int (i64) from a var.
 #[unsafe(no_mangle)]
-pub extern "C" fn pixelscript_var_get_i32(var: *mut Var) -> i32 {
+pub extern "C" fn pixelscript_var_get_int(var: *mut Var) -> i64 {
     if var.is_null() {
         return -1;
     }
 
-    let var = unsafe { Var::from_borrow(var) };
+    let b_var = unsafe { Var::from_borrow(var) };
 
-    var.get_int()
-}
-
-/// Get a I64 from a var.
-#[unsafe(no_mangle)]
-pub extern "C" fn pixelscript_var_get_i64(var: *mut Var) -> i64 {
-    if var.is_null() {
-        return -1;
+    unsafe {
+        match b_var.tag {
+            VarType::Int64 => b_var.value.i64_val,
+            VarType::UInt64 => b_var.value.u64_val as i64,
+            VarType::Bool => b_var.value.bool_val.into(),
+            VarType::Float64 => b_var.value.f64_val as i64,
+            _ => -1
+        }
     }
-
-    unsafe { Var::from_borrow(var).get_bigint() }
 }
 
-/// Get a U32 from a var.
+/// Get a uint (u64)
 #[unsafe(no_mangle)]
-pub extern "C" fn pixelscript_var_get_u32(var: *mut Var) -> u32 {
+pub extern "C" fn pixelscript_var_get_uint(var: *mut Var) -> u64 {
     if var.is_null() {
         return 0;
     }
 
-    unsafe { Var::from_borrow(var).get_uint() }
-}
+    let b_var = unsafe { Var::from_borrow(var) };
 
-/// Get a U64
-#[unsafe(no_mangle)]
-pub extern "C" fn pixelscript_var_get_u64(var: *mut Var) -> u64 {
-    if var.is_null() {
-        return 0;
+    unsafe {
+        match b_var.tag {
+            VarType::Int64 => b_var.value.i64_val as u64,
+            VarType::UInt64 => b_var.value.u64_val,
+            VarType::Bool => b_var.value.bool_val.into(),
+            VarType::Float64 => b_var.value.f64_val as u64,
+            _ => 0
+        }
     }
-
-    unsafe { Var::from_borrow(var).get_biguint() }
 }
 
-/// Get a F32
+/// Get a float (f64)
 #[unsafe(no_mangle)]
-pub extern "C" fn pixelscript_var_get_f32(var: *mut Var) -> f32 {
-    if var.is_null() {
-        return -1.0;
-    }
-
-    unsafe { Var::from_borrow(var).get_float() }
-}
-
-/// Get a F64
-#[unsafe(no_mangle)]
-pub extern "C" fn pixelscript_var_get_f64(var: *mut Var) -> f64 {
+pub extern "C" fn pixelscript_var_get_float(var: *mut Var) -> f64 {
     if var.is_null() {
         return -1.0;
     }
 
-    unsafe { Var::from_borrow(var).get_bigfloat() }
+    let b_var = unsafe { Var::from_borrow(var) };
+
+    unsafe {
+        match b_var.tag {
+            VarType::Int64 => b_var.value.i64_val as f64,
+            VarType::UInt64 => b_var.value.u64_val as f64,
+            VarType::Bool => b_var.value.bool_val.into(),
+            VarType::Float64 => b_var.value.f64_val,
+            _ => 0 as f64
+        }
+    }
 }
 
 /// Get a Bool
@@ -794,4 +776,75 @@ pub extern "C" fn pixelscript_stop_thread() {
     with_feature!("python", {
         PythonScripting::stop_thread();
     });
+}
+
+/// Call a ToString method on this Var. If already a string, it won't call it.
+/// 
+/// Host must free this memory with `pixelscript_free_var`
+#[unsafe(no_mangle)]
+pub extern "C" fn pixelscript_var_tostring(runtime: *mut Var, var: *mut Var) -> *mut Var {
+    assert_initiated!();
+
+    if var.is_null() || runtime.is_null() {
+        return ptr::null_mut();
+    }
+
+    // Borrow
+    let b_var = unsafe { Var::from_borrow(var) };
+
+    // If string or primative, no object calling needed
+    match b_var.tag {
+        VarType::Int64 => {
+            let val = b_var.get_i64().unwrap();
+            return Var::new_string(val.to_string()).into_raw();
+        },
+        VarType::UInt64 => {
+            let val = b_var.get_u64().unwrap();
+            return Var::new_string(val.to_string()).into_raw();
+        },
+        VarType::String => {
+            return Var::new_string(b_var.get_string().unwrap().clone()).into_raw();
+        },
+        VarType::Bool => {
+            return Var::new_string(b_var.get_bool().unwrap().to_string()).into_raw();
+        },
+        VarType::Float64 => {
+            return Var::new_string(b_var.get_f64().unwrap().to_string()).into_raw();
+        },
+        _ => {
+            // Do nothing
+        }
+    }
+
+    // Not a string, so let's convert
+    let runtime = unsafe { PixelScriptRuntime::from_var_ptr(runtime) };
+    if let Some(runtime) = runtime {
+        let args = vec![b_var];
+        let res = match runtime {
+            PixelScriptRuntime::Lua => {
+                with_feature!("lua", {
+                    LuaScripting::call_method("tostring", &args)
+                }, {
+                    Ok(Var::new_null())
+                })
+            },
+            PixelScriptRuntime::Python => {
+                with_feature!("python", {
+                    PythonScripting::call_method("str", &args)
+                }, {
+                    Ok(Var::new_null())
+                })
+            },
+            PixelScriptRuntime::JavaScript => todo!(),
+            PixelScriptRuntime::Easyjs => todo!(),
+        };
+
+        if let Ok(res) = res {
+            res.into_raw()
+        } else {
+            ptr::null_mut()
+        }
+    } else {
+        ptr::null_mut()
+    }
 }

@@ -209,8 +209,8 @@ mod tests {
         let n1_name = create_raw_string!("n1");
         let n2_name: *mut i8 = create_raw_string!("n2");
         pixelscript_add_callback(module, add_name, add_wrapper, ptr::null_mut());
-        let n1 = pixelscript_var_newi64(1);
-        let n2 = pixelscript_var_newi64(2);
+        let n1 = pixelscript_var_newint(1);
+        let n2 = pixelscript_var_newint(2);
         pixelscript_add_variable(module, n1_name, n1);
         pixelscript_add_variable(module, n2_name, n2);
 

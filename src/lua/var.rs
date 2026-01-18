@@ -32,23 +32,13 @@ pub(super) fn from_lua(value: LuaValue) -> Result<Var, anyhow::Error> {
         _ => {
             Ok(Var::new_null())
         }
-        // LuaValue::LightUserData(light_user_data) => todo!(),
-        // LuaValue::Table(table) => todo!(),
-        // LuaValue::Function(function) => todo!(),
-        // LuaValue::Thread(thread) => todo!(),
-        // LuaValue::UserData(any_user_data) => todo!(),
-        // LuaValue::Error(error) => todo!(),
-        // LuaValue::Other(value_ref) => todo!(),
-        // LuaNil => todo!(),
     }
 }
 
 /// Convert a Var into a LuaValue
 pub(super) fn into_lua(lua: &Lua, var: &Var) -> LuaResult<LuaValue> {
     match var.tag {
-            VarType::Int32 => Ok(mlua::Value::Integer(var.get_i32().unwrap() as i64)),
             VarType::Int64 => Ok(mlua::Value::Integer(var.get_i64().unwrap())),
-            VarType::UInt32 => Ok(mlua::Value::Integer(var.get_u32().unwrap() as i64)),
             VarType::UInt64 => Ok(mlua::Value::Integer(var.get_u64().unwrap() as i64)),
             VarType::String => {
                 let contents = var.get_string().unwrap();
@@ -57,7 +47,6 @@ pub(super) fn into_lua(lua: &Lua, var: &Var) -> LuaResult<LuaValue> {
                 Ok(mlua::Value::String(lua_str))
             }
             VarType::Bool => Ok(mlua::Value::Boolean(var.get_bool().unwrap())),
-            VarType::Float32 => Ok(mlua::Value::Number(var.get_f32().unwrap() as f64)),
             VarType::Float64 => Ok(mlua::Value::Number(var.get_f64().unwrap())),
             VarType::Null => Ok(mlua::Value::Nil),
             VarType::Object => {

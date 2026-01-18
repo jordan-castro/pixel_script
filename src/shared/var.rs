@@ -58,30 +58,27 @@ macro_rules! write_is_methods {
     };
 }
 
-// Macro for writing out the FromVars
-macro_rules! implement_from_var {
-    ($($t:ty, $func:ident);*) => {
-        $(
-            impl FromVar for $t {
-                fn from_var(var:&Var) -> Result<Self, Error> {
-                    var.$func()
-                }
-            }
-        )*
-    };
-}
+// // Macro for writing out the FromVars
+// macro_rules! implement_from_var {
+//     ($($t:ty, $func:ident);*) => {
+//         $(
+//             impl FromVar for $t {
+//                 fn from_var(var:&Var) -> Result<Self, Error> {
+//                     var.$func()
+//                 }
+//             }
+//         )*
+//     };
+// }
 
 /// This represents the variable type that is being read or created.
 #[repr(u32)]
 #[derive(Debug, PartialEq, Clone)]
 pub enum VarType {
-    Int32,
     Int64,
-    UInt32,
     UInt64,
     String,
     Bool,
-    Float32,
     Float64,
     /// Lua (nil), Python (None), JS/easyjs (null)
     Null,
@@ -96,13 +93,10 @@ pub enum VarType {
 /// The Variables actual value union.
 #[repr(C)]
 pub union VarValue {
-    pub i32_val: i32,
     pub i64_val: i64,
-    pub u32_val: u32,
     pub u64_val: u64,
     pub string_val: *mut c_char,
     pub bool_val: bool,
-    pub f32_val: f32,
     pub f64_val: f64,
     pub null_val: *const c_void,
     pub object_val: *mut c_void,
@@ -150,10 +144,6 @@ impl Var {
         // TODO: type checks
         let object = get_object(self.get_object_ptr()).unwrap();
         object.ptr
-    }
-
-    pub fn get<T: FromVar>(&self) -> Result<T, Error> {
-        T::from_var(self)
     }
 
     /// Get the Rust string from the Var.
@@ -267,9 +257,7 @@ impl Var {
     /// Get the ptr of the object if Host, i32, i64, u32, u64
     pub fn get_object_ptr(&self) -> i32 {
         match self.tag {
-            VarType::Int32 => self.get_i32().unwrap(),
             VarType::Int64 => self.get_i64().unwrap() as i32,
-            VarType::UInt32 => self.get_u32().unwrap() as i32,
             VarType::UInt64 => self.get_u64().unwrap() as i32,
             VarType::HostObject => unsafe {
                 self.value.host_object_val
@@ -278,108 +266,99 @@ impl Var {
         }
     }
 
-    /// Get Big Integer value
-    pub fn get_bigint(&self) -> i64 {
-        match self.tag {
-            VarType::Int32 => self.get_i32().unwrap() as i64,
-            VarType::Int64 => self.get_i64().unwrap() as i64,
-            VarType::UInt32 => self.get_u32().unwrap() as i64,
-            VarType::UInt64 => self.get_u64().unwrap() as i64,
-            VarType::Float32 => self.get_f32().unwrap() as i64,
-            VarType::Float64 => self.get_f64().unwrap() as i64,
-            _ => {
-                -1
-            }
-        }
-    }
+    // /// Get Big Integer value
+    // pub fn get_bigint(&self) -> i64 {
+    //     match self.tag {
+    //         VarType::Int32 => self.get_i32().unwrap() as i64,
+    //         VarType::Int64 => self.get_i64().unwrap() as i64,
+    //         VarType::UInt32 => self.get_u32().unwrap() as i64,
+    //         VarType::UInt64 => self.get_u64().unwrap() as i64,
+    //         VarType::Float32 => self.get_f32().unwrap() as i64,
+    //         VarType::Float64 => self.get_f64().unwrap() as i64,
+    //         _ => {
+    //             -1
+    //         }
+    //     }
+    // }
 
-    /// Get Int32 value
-    pub fn get_int(&self) -> i32 {
-        match self.tag {
-            VarType::Int32 => self.get_i32().unwrap(),
-            VarType::UInt32 => self.get_u32().unwrap() as i32,
-            VarType::Float32 => self.get_f32().unwrap() as i32,
-            _ => {
-                -1
-            }
-        }
-    }
+    // /// Get Int32 value
+    // pub fn get_int(&self) -> i32 {
+    //     match self.tag {
+    //         VarType::Int32 => self.get_i32().unwrap(),
+    //         VarType::UInt32 => self.get_u32().unwrap() as i32,
+    //         VarType::Float32 => self.get_f32().unwrap() as i32,
+    //         _ => {
+    //             -1
+    //         }
+    //     }
+    // }
 
-    /// Get UInt value
-    pub fn get_uint(&self) -> u32 {
-        match self.tag {
-            VarType::UInt32 => self.get_u32().unwrap(),
-            _ => {
-                0
-            }
-        }
-    }
+    // /// Get UInt value
+    // pub fn get_uint(&self) -> u32 {
+    //     match self.tag {
+    //         VarType::UInt32 => self.get_u32().unwrap(),
+    //         _ => {
+    //             0
+    //         }
+    //     }
+    // }
 
-    /// Get BigUint value
-    pub fn get_biguint(&self) -> u64 {
-        match self.tag {
-            VarType::UInt32 => self.get_u32().unwrap() as u64,
-            VarType::UInt64 => self.get_u64().unwrap(),
-            _ => {
-                0
-            }
-        }
-    }
+    // /// Get BigUint value
+    // pub fn get_biguint(&self) -> u64 {
+    //     match self.tag {
+    //         VarType::UInt32 => self.get_u32().unwrap() as u64,
+    //         VarType::UInt64 => self.get_u64().unwrap(),
+    //         _ => {
+    //             0
+    //         }
+    //     }
+    // }
 
-    /// Get BigFloat value
-    pub fn get_bigfloat(&self) -> f64 {
-        match self.tag {
-            VarType::Int32 => self.get_i32().unwrap() as f64,
-            VarType::Int64 => self.get_i64().unwrap() as f64,
-            VarType::UInt32 => self.get_u32().unwrap() as f64,
-            VarType::UInt64 => self.get_u64().unwrap() as f64,
-            VarType::Float32 => self.get_f32().unwrap() as f64,
-            VarType::Float64 => self.get_f64().unwrap(),
-            _ => {
-                -1.0
-            }
-        }
-    }
+    // /// Get BigFloat value
+    // pub fn get_bigfloat(&self) -> f64 {
+    //     match self.tag {
+    //         VarType::Int32 => self.get_i32().unwrap() as f64,
+    //         VarType::Int64 => self.get_i64().unwrap() as f64,
+    //         VarType::UInt32 => self.get_u32().unwrap() as f64,
+    //         VarType::UInt64 => self.get_u64().unwrap() as f64,
+    //         VarType::Float32 => self.get_f32().unwrap() as f64,
+    //         VarType::Float64 => self.get_f64().unwrap(),
+    //         _ => {
+    //             -1.0
+    //         }
+    //     }
+    // }
 
-    /// Get Float value
-    pub fn get_float(&self) -> f32 {
-        match self.tag {
-            VarType::Int32 => self.get_i32().unwrap() as f32,
-            VarType::UInt32 => self.get_u32().unwrap() as f32,
-            VarType::Float32 => self.get_f32().unwrap(),
-            _ => {
-                -1.0
-            }
-        }
-    }
+    // /// Get Float value
+    // pub fn get_float(&self) -> f32 {
+    //     match self.tag {
+    //         VarType::Int32 => self.get_i32().unwrap() as f32,
+    //         VarType::UInt32 => self.get_u32().unwrap() as f32,
+    //         VarType::Float32 => self.get_f32().unwrap(),
+    //         _ => {
+    //             -1.0
+    //         }
+    //     }
+    // }
 
     write_func!(
-        (get_i32, i32_val, i32, VarType::Int32),
-        (get_u32, u32_val, u32, VarType::UInt32),
         (get_i64, i64_val, i64, VarType::Int64),
         (get_u64, u64_val, u64, VarType::UInt64),
         (get_bool, bool_val, bool, VarType::Bool),
-        (get_f32, f32_val, f32, VarType::Float32),
         (get_f64, f64_val, f64, VarType::Float64)
     );
 
     // $t:ty, $func:ident, $vt:expr, $vn:ident
     write_new_methods! {
-        i32, new_i32, VarType::Int32, i32_val;
         i64, new_i64, VarType::Int64, i64_val;
-        u32, new_u32, VarType::UInt32, u32_val;
         u64, new_u64, VarType::UInt64, u64_val;
-        f32, new_f32, VarType::Float32, f32_val;
         f64, new_f64, VarType::Float64, f64_val;
         bool, new_bool, VarType::Bool, bool_val
     }
 
     write_is_methods! {
-        is_i32, VarType::Int32;
         is_i64, VarType::Int64;
-        is_u32, VarType::UInt32;
         is_u64, VarType::UInt64;
-        is_f32, VarType::Float32;
         is_f64, VarType::Float64;
         is_bool, VarType::Bool;
         is_string, VarType::String;
@@ -403,29 +382,13 @@ impl Drop for Var {
     }
 }
 
-/// Simple trait for Vars to get the type when writing code out.
-pub trait FromVar: Sized {
-    fn from_var(var: &Var) -> Result<Self, Error>;
-}
-
-implement_from_var! {
-    i32, get_i32;
-    u32, get_u32;
-    String, get_string;
-    f32, get_f32;
-    f64, get_f64;
-    bool, get_bool
-}
-
 impl PtrMagic for Var {}
 
 impl Clone for Var {
     fn clone(&self) -> Self {
         unsafe {
             match self.tag {
-                VarType::Int32 => Var::new_i32(self.value.i32_val),
                 VarType::Int64 => Var::new_i64(self.value.i64_val),
-                VarType::UInt32 => Var::new_u32(self.value.u32_val),
                 VarType::UInt64 => Var::new_u64(self.value.u64_val),
                 VarType::String => Var {
                     tag: VarType::String,
@@ -434,7 +397,6 @@ impl Clone for Var {
                     },
                 },
                 VarType::Bool => Var::new_bool(self.value.bool_val),
-                VarType::Float32 => Var::new_f32(self.value.f32_val),
                 VarType::Float64 => Var::new_f64(self.value.f64_val),
                 VarType::Null => Var::new_null(),
                 VarType::Object => Var {
@@ -451,5 +413,8 @@ impl Clone for Var {
 
 pub trait ObjectMethods {
     /// Call a method on a object.
-    fn object_call(var: &Var, method: &str, args: &Vec<Var>) -> Result<Var, Error>;
+    fn object_call(var: &Var, method: &str, args: &Vec<&mut Var>) -> Result<Var, Error>;
+
+    /// Call a method and pass in args
+    fn call_method(method: &str, args: &Vec<&mut Var>) -> Result<Var, Error>;
 }

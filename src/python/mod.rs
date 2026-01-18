@@ -85,8 +85,8 @@ fn run_py(
             let py_res = pocketpy::py_formatexc();
             let py_res = own_string!(py_res);
 
-            // Clear the error
-            // pocketpy::py_clearexc(pocketpy::py_get);
+            // Clear the exception
+            pocketpy::py_clearexc(std::ptr::null_mut());
 
             py_res
         } else {
@@ -206,7 +206,6 @@ pub(self) fn make_private(name: &str) -> String {
 unsafe extern "C" fn import_file(arg1: *const std::ffi::c_char) -> *mut std::ffi::c_char {
     // Borrow string
     let b = borrow_string!(arg1);
-    println!("b: {b}");
     // Remove .py and check if this is a directory
     let file_path = {
         let pos_dir = &b[0..b.len() - 3];
@@ -298,7 +297,7 @@ impl ObjectMethods for PythonScripting {
     fn object_call(
         var: &crate::shared::var::Var,
         method: &str,
-        args: &Vec<crate::shared::var::Var>,
+        args: &Vec<&mut crate::shared::var::Var>,
     ) -> Result<crate::shared::var::Var, anyhow::Error> {
         // Get the pyref
         let pyref = unsafe { pocketpy::py_getreg(0) };
@@ -310,11 +309,11 @@ impl ObjectMethods for PythonScripting {
             let pymethod_name = pocketpy::py_name(method_name);
             pocketpy::py_getattr(pyref, pymethod_name);
             // Get the result pushed to the stack.
-            let pymethod = pocketpy::py_getreg(0);
+            let pymethod = pocketpy::py_retval();
 
             // Convert args into py_Ref
             for i in 0..args.len() {
-                let pyref = pocketpy::py_getreg((i + 1) as i32);
+                let pyref = pocketpy::py_getreg(i  as i32);
                 var_to_pocketpyref(pyref, &args[i]);
                 pocketpy::py_push(pyref);
             }
@@ -326,5 +325,28 @@ impl ObjectMethods for PythonScripting {
         // Result is py_retval
         let result = unsafe { pocketpy::py_retval() };
         Ok(pocketpyref_to_var(result))
+    }
+
+    fn call_method(method: &str, args: &Vec<&mut crate::shared::var::Var>) -> Result<crate::shared::var::Var, anyhow::Error> {
+        // Convert methods to pocketpy
+        let method_name = create_raw_string!(method);
+        unsafe {
+            let pymethod_name = pocketpy::py_name(method_name);
+            let pymethod = pocketpy::py_getglobal(pymethod_name);
+
+            for i in 0..args.len() {
+                let pyref = pocketpy::py_getreg((i + 1) as i32);
+                var_to_pocketpyref(pyref, &args[i]);
+                pocketpy::py_push(pyref);
+            }
+
+            // Call
+            pocketpy::py_call(pymethod, args.len() as i32, std::ptr::null_mut());
+
+            free_raw_string!(method_name);
+
+            let result = pocketpy::py_retval();
+            Ok(pocketpyref_to_var(result))
+        }
     }
 }

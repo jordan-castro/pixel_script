@@ -2,6 +2,7 @@ extern crate cbindgen;
 
 use std::env;
 use std::path::PathBuf;
+use std::process::Command;
 
 /// Build the pixelscript.h C bindings
 fn build_pixelscript_h() {
@@ -30,9 +31,13 @@ fn build_pocketpy() {
 
     // When MSVC, gotta set some stuff
     let builder = std::env::var("CARGO_CFG_TARGET_ENV").unwrap_or_default();
+    let compiler = build.get_compiler();
     if builder == "msvc" {
         build.flag("/utf-8");
         build.flag("/experimental:c11atomics");
+    } else if compiler.is_like_gnu() {
+        build.flag("-O3");
+        build.flag("-fPIC");
     }
 
     // Check if release or debug mode
@@ -49,10 +54,60 @@ fn build_pocketpy() {
     build.compile("pocketpy");
 }
 
+fn find_gnu_include_path() -> Vec<String> {
+    // Get current os
+    let target_os = env::var("CARGO_CFG_TARGET_OS").unwrap_or_default();
+    if target_os != "windows" {
+        return vec![];
+    }
+
+    // Check for current toolchain
+    let target_env = env::var("CARGO_CFG_TARGET_ENV").unwrap_or_default();
+    if target_env != "gnu" {
+        return vec![];
+    }
+    // Ok here we need to find out headers...
+    let output = Command::new("gcc")
+        .arg("-v")
+        .arg("-E")
+        .arg("-")
+        .stdin(std::process::Stdio::null())
+        .output()
+        .ok();
+    let mut includes = vec![];
+
+    if let Some(output) = output {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        let mut scanning = false;
+
+        for line in stderr.lines() {
+            if line.contains("#include <...> search starts here") {
+                scanning = true;
+                continue;
+            }
+            if line.contains("End of search list") {
+                break;
+            }
+
+            if scanning {
+                let path = line.trim();
+                if !path.is_empty() {
+                    includes.push(format!("-isystem{}", path.replace("\\", "/")));
+                }
+            }            
+        }
+    }
+
+    includes
+}
+
 /// Create PocketPy Rust bindings
 #[cfg(feature = "python")]
 fn build_pocketpy_bindings() {
-    let bindings = bindgen::Builder::default()
+    // If using gcc on windows, we might need to find the gcc include paths
+    // let include_paths = 
+
+    let mut builder = bindgen::Builder::default()
         .header("libs/pocketpy/pocketpy.h")
         .clang_arg("-DPK_IS_PUBLIC_INCLUDE")
         .clang_arg("-Ilibs/pocketpy")
@@ -61,9 +116,13 @@ fn build_pocketpy_bindings() {
         .parse_callbacks(Box::new(bindgen::CargoCallbacks::new()))
         .allowlist_function("py_.*")
         .allowlist_type("py_.*")
-        .allowlist_var("py_.*")
-        .generate()
-        .expect("Unable to build Pocketpy rust bindings");
+        .allowlist_var("py_.*");
+
+    for arg in find_gnu_include_path() {
+        builder = builder.clang_arg(arg);
+    }
+
+    let bindings = builder.generate().expect("Unable to build Pocketpy rust bindings");
  
     // Write bindings
     let out_path = PathBuf::from(env::var("OUT_DIR").unwrap());

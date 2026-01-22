@@ -37,10 +37,30 @@ typedef uint32_t VarType;
  * Public enum for supported runtimes.
  */
 typedef enum PixelScriptRuntime {
+  /**
+   * Lua v5.4 with mlua.
+   */
   Lua,
+  /**
+   * Python v3.x with pocketpy.
+   */
   Python,
+  /**
+   * ES 2020 using rquickjs
+   */
   JavaScript,
+  /**
+   * v0.4.5 using easyjsc
+   */
   Easyjs,
+  /**
+   * Python >= v3.8 with RustPython
+   */
+  RustPython,
+  /**
+   * LuaJit v5.4 with mlua.
+   */
+  LuaJit,
 } PixelScriptRuntime;
 
 /**

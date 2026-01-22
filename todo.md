@@ -45,7 +45,6 @@
 - Eventually look back at this
 
 ## Python (PocketPy)
-- custom imports
 
 ## JS
 - add_variable

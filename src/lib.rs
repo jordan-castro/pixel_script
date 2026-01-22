@@ -589,6 +589,8 @@ pub extern "C" fn pixelscript_object_call(
         }
         PixelScriptRuntime::JavaScript => todo!(),
         PixelScriptRuntime::Easyjs => todo!(),
+        PixelScriptRuntime::RustPython => todo!(),
+        PixelScriptRuntime::LuaJit => todo!()
     };
 
     if let Ok(var) = var {
@@ -846,6 +848,8 @@ pub extern "C" fn pixelscript_var_tostring(
             }
             PixelScriptRuntime::JavaScript => todo!(),
             PixelScriptRuntime::Easyjs => todo!(),
+            PixelScriptRuntime::RustPython => todo!(),
+            PixelScriptRuntime::LuaJit => todo!(),
         };
 
         if let Ok(res) = res {

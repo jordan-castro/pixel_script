@@ -15,14 +15,14 @@ Because most games pick only one language for scripting. PixelScript gives modde
 Each language runtime uses the same PixelScript bindings.
 
 ## Version
-pixelscript crate is currently at version 0.1.0.
+pixelscript crate is currently at version 0.2.0.
 
 ## How to use
-To use Pixel Script, first install the crate into your rust project.
-```bash
-cargo add pixelscript
-```
-And update the `features` flag to include the languages your game/app want.
+To use Pixel Script, you will have to clone this repository.
+When compiling, if you only want a specific language you will have to set `--no-default-features` and `--features "<language1>,<language2>"`.
+If you want to compile for all languages simply run the build script under `scripts/` It will compile the library and place the files under `/pxsb`.
+
+For rust based use I will be adding a Rust wrapper, which is funny because this is written in Rust. But I want all systems that use the pixelscript library (rust included) to use the low level bindings. Which means I will write a High level and safe rust bindings. Until then, hack it using FFI.
 
 ## Supported languages
 | Feature flag     | Language          | Engine                | Notes                           |
@@ -32,7 +32,7 @@ And update the `features` flag to include the languages your game/app want.
 | `js`             | JavaScript        | rquickjs              | Quickjs, C library              |
 | `easyjs`         | EasyJS            | Custom                | Requires a JS feature           |
 | `rustpython`     | Python (CPython compatible)    | rustpython              | Larger binary, Full Python library support, currently leaking memory.                  |
-| `lua-jit`        | LuaJit            | mlua                  | does not work on ios, v5.4      |
+| `luajit`        | LuaJit            | mlua                  | does not work on ios, v5.4      |
 <!-- | `js-quick`       | JavaScript        | rquickjs              | QuickJS, more complete          | -->
 
 When including `easyjs` make sure to also include a JavaScript feature otherwise it will not work.

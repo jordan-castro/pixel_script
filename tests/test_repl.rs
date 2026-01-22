@@ -360,6 +360,8 @@ mod tests {
                     }
                     PixelScriptRuntime::JavaScript => todo!(),
                     PixelScriptRuntime::Easyjs => todo!(),
+                    PixelScriptRuntime::RustPython => todo!(),
+                    PixelScriptRuntime::LuaJit => todo!(),
                 };
 
                 if !err.is_empty() {

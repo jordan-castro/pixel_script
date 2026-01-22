@@ -4,6 +4,7 @@ import os
 import shutil
 from pathlib import Path
 import subprocess
+import sys
 
 
 # Config
@@ -40,13 +41,46 @@ def collect_libs(folder, rule="/**/*"):
             move(lib)
 
 
+# Get the args for target and features
+argv = []
+if len(sys.argv) > 0:
+    argv = sys.argv[1:]
+
+target = ""
+rtarget = ""
+features = ["--no-default-features"]
+
+for arg in argv:
+    if "target" in arg:
+        # Split target
+        rtarget = arg.split("=")[-1]
+        target =  "--target=" + rtarget
+    elif "features" in arg:
+        # Split features
+        features_ = ",".join(arg.split("=")[-1])
+        features += ["--features", f'"{features_}"']
+
+
 # Build in release mode
-subprocess.call(["cargo", "build", "--release"])
+cmd = ["cargo", "build", "--release"]
+# Grab target and features if passed
+if target:
+    cmd += [target]
+if len(features) > 1:
+    cmd += features
+subprocess.call(cmd)
+
+# Find build directory
+path_to_build = "target/release/build"
+path_to_release = "target/release"
+if target:
+    path_to_build = f"target/{rtarget}/release/build"
+    path_to_release = f"target/{rtarget}/release"
 
 Path(SOURCE).mkdir(exist_ok=True)
-collect_libs("target/release", rule="/*")
+collect_libs(path_to_release, rule="/*")
 
-build_dir = Path("target/release/build")
+build_dir = Path(path_to_build)
 
 for path in os.listdir(build_dir):
     for lib in LIB_CRATES:

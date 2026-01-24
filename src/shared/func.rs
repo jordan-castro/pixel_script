@@ -6,7 +6,7 @@
 //
 // Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific language governing permissions and limitations under the License.
 //
-use crate::shared::PtrMagic;
+use crate::shared::{PtrMagic, var::{pxs_VarList, pxs_VarType, pxs_VarValue}};
 
 use super::var::pxs_Var;
 use std::{
@@ -17,8 +17,7 @@ use std::{
 
 /// Function reference used in C.
 ///
-/// argc: i32, The number of args.
-/// argc: *const *mut Var, a C Array of args.
+/// args: *mut pxs_Var, A list of vars.
 /// opaque: *mut c_void, opaque user data.
 ///
 /// Func handles it's own memory, so no need to free the *mut Var returned or the argvs.
@@ -26,7 +25,7 @@ use std::{
 /// But if you use any Vars within the function, you will have to free them before the function returns.
 #[allow(non_camel_case_types)]
 pub type pxs_Func =
-    unsafe extern "C" fn(argc: usize, argv: *mut *mut pxs_Var, opaque: *mut c_void) -> *mut pxs_Var;
+    unsafe extern "C" fn(args: *mut pxs_Var, opaque: *mut c_void) -> *mut pxs_Var;
 
 /// Basic rust structure to track Funcs and opaques together.
 pub struct Function {
@@ -117,13 +116,22 @@ pub unsafe fn call_function(fn_idx: i32, args: Vec<pxs_Var>) -> pxs_Var {
         (function.func, function.opaque)
     };
 
-    let argc = args.len();
-    let argv = pxs_Var::make_pointer_array(args);
+    // Convert the pxs_Var vector into a list.
+    // Do this because I don't want to mess with the older code.
+    let args = pxs_Var{
+        tag: pxs_VarType::List,
+        value: pxs_VarValue {
+            list_val: pxs_VarList {
+                vars: args,
+            }.into_raw()
+        },
+    };
+    let args_ptr = args.into_raw();
 
     unsafe {
-        let res = func(argc, argv, opaque);
-        // Free ptr array
-        pxs_Var::free_pointer_array(argv, argc);
+        let res = func(args_ptr, opaque);
+        // Free args
+        let _ = pxs_Var::from_raw(args_ptr);
 
         if res.is_null() {
             pxs_Var::new_null()

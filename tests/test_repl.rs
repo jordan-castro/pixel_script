@@ -63,21 +63,23 @@ mod tests {
         let _ = unsafe { Person::from_borrow(ptr as *mut Person) };
     }
 
-    pub extern "C" fn set_name(argc: usize, argv: *mut *mut pxs_Var, _opaque: *mut c_void) -> *mut pxs_Var {
+    pub extern "C" fn set_name(
+        args: *mut pxs_Var,
+        _opaque: *mut c_void,
+    ) -> *mut pxs_Var {
         unsafe {
-            let args = pxs_Var::slice_raw(argv, argc);
             // Get ptr
-            let pixel_object_var = pxs_Var::from_borrow(args[1]);
+            let pixel_object_var = pxs_Var::from_borrow(pxs_listget(args, 1));
             let host_ptr = pixel_object_var.get_host_ptr();
             let p = Person::from_borrow(host_ptr as *mut Person);
 
             // Check if first arg is self or nme
             let name = {
-                let first_arg = pxs_Var::from_borrow(args[2]);
+                let first_arg = pxs_Var::from_borrow(pxs_listget(args, 2));
                 if first_arg.is_string() {
                     first_arg
                 } else {
-                    pxs_Var::from_borrow(args[3])
+                    pxs_Var::from_borrow(pxs_listget(args, 3))
                 }
             };
 
@@ -87,12 +89,13 @@ mod tests {
         }
     }
 
-    pub extern "C" fn get_name(argc: usize, argv: *mut *mut pxs_Var, _opaque: *mut c_void) -> *mut pxs_Var {
+    pub extern "C" fn get_name(
+        args: *mut pxs_Var,
+        _opaque: *mut c_void,
+    ) -> *mut pxs_Var {
         unsafe {
-            let args = pxs_Var::slice_raw(argv, argc);
-
             // Get ptr
-            let pixel_object_var = pxs_Var::from_borrow(args[1]);
+            let pixel_object_var = pxs_Var::from_borrow(pxs_listget(args, 1));
             let host_ptr = pixel_object_var.get_host_ptr();
             let p = Person::from_borrow(host_ptr as *mut Person);
 
@@ -101,25 +104,23 @@ mod tests {
     }
 
     pub extern "C" fn new_person(
-        argc: usize,
-        argv: *mut *mut pxs_Var,
+        args: *mut pxs_Var,
         opaque: *mut c_void,
     ) -> *mut pxs_Var {
         unsafe {
-            let args = std::slice::from_raw_parts(argv, argc);
-            let p_name = pxs_Var::from_borrow(args[1]);
+            let p_name = pxs_Var::from_borrow(pxs_listget(args, 1));
             let p_name = p_name.get_string().unwrap();
             let p = Person::new(p_name.clone());
             let typename = create_raw_string!("Person");
 
             let ptr = Person::into_raw(p) as *mut c_void;
-            let pixel_object = pxs_new_object(ptr, free_person, typename);
+            let pixel_object = pxs_newobject(ptr, free_person, typename);
             let set_name_raw = create_raw_string!("set_name");
             let get_name_raw = create_raw_string!("get_name");
-            pxs_object_add_callback(pixel_object, set_name_raw, set_name, opaque);
-            pxs_object_add_callback(pixel_object, get_name_raw, get_name, opaque);
+            pxs_object_addfunc(pixel_object, set_name_raw, set_name, opaque);
+            pxs_object_addfunc(pixel_object, get_name_raw, get_name, opaque);
             // Save...
-            let var = pxs_var_newhost_object(pixel_object);
+            let var = pxs_newhost(pixel_object);
 
             free_raw_string!(set_name_raw);
             free_raw_string!(get_name_raw);
@@ -130,22 +131,19 @@ mod tests {
 
     // Testing callbacks
     pub extern "C" fn print_wrapper(
-        argc: usize,
-        argv: *mut *mut pxs_Var,
+        args: *mut pxs_Var,
         _opaque: *mut c_void,
     ) -> *mut pxs_Var {
         unsafe {
-            let args = std::slice::from_raw_parts(argv, argc);
-
-            let runtime = args[0];
+            let runtime = pxs_listget(args, 0);
 
             let mut string = String::new();
-            for i in 1..argc {
-                let var = pxs_var_tostring(runtime, args[i]);
+            for i in 1..pxs_listlen(args) {
+                let var = pxs_tostring(runtime, pxs_listget(args, i));
                 if let Ok(s) = (*var).get_string() {
                     string.push_str(format!("{s} ").as_str());
                 }
-                pxs_free_var(var);
+                pxs_freevar(var);
             }
 
             println!("From Runtime: {string}");
@@ -155,32 +153,26 @@ mod tests {
     }
 
     pub extern "C" fn add_wrapper(
-        argc: usize,
-        argv: *mut *mut pxs_Var,
+        args: *mut pxs_Var,
         _opaque: *mut c_void,
     ) -> *mut pxs_Var {
         // Assumes n1 and n2
         unsafe {
-            let args = std::slice::from_raw_parts(argv, argc);
-
-            let n1 = pxs_Var::from_borrow(args[1]);
-            let n2 = pxs_Var::from_borrow(args[2]);
+            let n1 = pxs_Var::from_borrow(pxs_listget(args, 1));
+            let n2 = pxs_Var::from_borrow(pxs_listget(args, 2));
 
             pxs_Var::new_i64(n1.value.i64_val + n2.value.i64_val).into_raw()
         }
     }
 
     pub extern "C" fn sub_wrapper(
-        argc: usize,
-        argv: *mut *mut pxs_Var,
+        args: *mut pxs_Var,
         _opaque: *mut c_void,
     ) -> *mut pxs_Var {
         // Assumes n1 and n2
         unsafe {
-            let args = std::slice::from_raw_parts(argv, argc);
-
-            let n1 = pxs_Var::from_borrow(args[1]);
-            let n2 = pxs_Var::from_borrow(args[2]);
+            let n1 = pxs_Var::from_borrow(pxs_listget(args, 1));
+            let n2 = pxs_Var::from_borrow(pxs_listget(args, 2));
 
             pxs_Var::new_i64(n1.value.i64_val - n2.value.i64_val).into_raw()
         }
@@ -273,37 +265,37 @@ mod tests {
         println!("Inside Test add module");
         pxs_initialize();
         let module_name = create_raw_string!("pxs");
-        let module = pxs_new_module(module_name);
+        let module = pxs_newmod(module_name);
         // Save methods
         let add_name = create_raw_string!("add");
         let n1_name = create_raw_string!("n1");
         let n2_name: *mut i8 = create_raw_string!("n2");
-        pxs_add_callback(module, add_name, add_wrapper, ptr::null_mut());
-        let n1 = pxs_var_newint(1);
-        let n2 = pxs_var_newint(2);
-        pxs_add_variable(module, n1_name, n1);
-        pxs_add_variable(module, n2_name, n2);
+        pxs_addfunc(module, add_name, add_wrapper, ptr::null_mut());
+        let n1 = pxs_newint(1);
+        let n2 = pxs_newint(2);
+        pxs_addvar(module, n1_name, n1);
+        pxs_addvar(module, n2_name, n2);
 
         let name = create_raw_string!("print");
-        pxs_add_callback(module, name, print_wrapper, ptr::null_mut());
+        pxs_addfunc(module, name, print_wrapper, ptr::null_mut());
         let var_name = create_raw_string!("name");
         let jordan = create_raw_string!("Jordan C");
-        let var = pxs_var_newstring(jordan);
-        pxs_add_variable(module, var_name, var);
+        let var = pxs_newstring(jordan);
+        pxs_addvar(module, var_name, var);
 
         let object_name = create_raw_string!("Person");
-        pxs_add_object(module, object_name, new_person, ptr::null_mut());
+        pxs_addobject(module, object_name, new_person, ptr::null_mut());
 
         // Add a inner module
         let math_module_name = create_raw_string!("math");
-        let math_module = pxs_new_module(math_module_name);
+        let math_module = pxs_newmod(math_module_name);
 
         // Add a sub function
         let sub_name = create_raw_string!("sub");
-        pxs_add_callback(math_module, sub_name, sub_wrapper, ptr::null_mut());
+        pxs_addfunc(math_module, sub_name, sub_wrapper, ptr::null_mut());
 
-        pxs_add_submodule(module, math_module);
-        pxs_add_module(module);
+        pxs_add_submod(module, math_module);
+        pxs_addmod(module);
 
         free_raw_string!(module_name);
         free_raw_string!(add_name);
@@ -338,8 +330,8 @@ mod tests {
         // test_add_object();
         // println!("Object");
 
-        pxs_set_file_reader(file_loader);
-        pxs_set_dir_reader(dir_reader);
+        pxs_set_filereader(file_loader);
+        pxs_set_dirreader(dir_reader);
 
         let runtime = PixelScriptRuntime::Python;
         let mut lines = vec![];

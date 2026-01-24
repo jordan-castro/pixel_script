@@ -1,6 +1,6 @@
 [package]
 name = "pixelscript"
-version = "0.2.0"
+version = "0.3.0"
 edition = "2024"
 license = "Apache-2.0"
 
@@ -22,16 +22,17 @@ bindgen = "0.72.1"
 
 [features]
 # Default includes all languages.
-default = ["lua", "python"]
+default = ["lua", "python", "php"]
 # Include LUA scripting.
 lua = ["dep:mlua"]
 # Include Python scripting. Via pocketpy
 python = []
+# Include PHP scripting. v5.3 Via PH7
+php = []
 # Include Python scripting. via rustpython
 # rustpython = ["dep:rustpython-vm", "dep:rustpython-compiler"]
 
 include-core = []
-all = ["lua", "python"]
 
 [profile.release]
 opt-level = "z"

@@ -21,7 +21,7 @@ use crate::{
         module::create_module,
         var::{pocketpyref_to_var, var_to_pocketpyref},
     },
-    shared::{PixelScript, read_file, read_file_dir, var::{ObjectMethods, pxs_Var}},
+    shared::{PixelScript, read_file, read_file_dir, var::{ObjectMethods, pxs_Var, pxs_VarList}},
 };
 
 // Allow for the binidngs only
@@ -297,7 +297,7 @@ impl PixelScript for PythonScripting {
 }
 
 /// Add pxs vars to the stack
-fn add_args(args: &Vec<&mut pxs_Var>) {
+fn add_args(args: &Vec<pxs_Var>) {
     // Convert args into py_Ref
     for i in 0..args.len() {
         let pyref = unsafe { pocketpy::py_pushtmp() };
@@ -309,7 +309,7 @@ impl ObjectMethods for PythonScripting {
     fn object_call(
         var: &crate::shared::var::pxs_Var,
         method: &str,
-        args: &Vec<&mut crate::shared::var::pxs_Var>,
+        args: &mut crate::shared::var::pxs_VarList,
     ) -> Result<crate::shared::var::pxs_Var, anyhow::Error> {
         // Make a object ref
         let obj_ref = unsafe { pocketpy::py_pushtmp() };
@@ -330,12 +330,12 @@ impl ObjectMethods for PythonScripting {
             // Push self
             pocketpy::py_push(obj_ref);
 
-            add_args(args);
+            add_args(&args.vars);
 
             // Now call
             // Result is py_retval
             // Call it via vectrocall
-            let ok = pocketpy::py_vectorcall(args.len() as u16, 0);
+            let ok = pocketpy::py_vectorcall(args.vars.len() as u16, 0);
             if !ok {
                 return Ok(pxs_Var::new_null());
             }
@@ -350,7 +350,7 @@ impl ObjectMethods for PythonScripting {
 
     fn call_method(
         method: &str,
-        args: &Vec<&mut crate::shared::var::pxs_Var>,
+        args: &mut crate::shared::var::pxs_VarList,
     ) -> Result<crate::shared::var::pxs_Var, anyhow::Error> {
         // Convert methods to pocketpy
         let method_name = create_raw_string!(method);
@@ -382,10 +382,10 @@ impl ObjectMethods for PythonScripting {
             // Push self, in this case nil.
             pocketpy::py_pushnil();
 
-            add_args(args);
+            add_args(&args.vars);
 
             // Call it via vectrocall
-            let ok = pocketpy::py_vectorcall(args.len() as u16, 0);
+            let ok = pocketpy::py_vectorcall(args.vars.len() as u16, 0);
             if !ok {
                 return Ok(pxs_Var::new_null());
             }
@@ -397,7 +397,7 @@ impl ObjectMethods for PythonScripting {
         }
     }
     
-    fn var_call(method: &pxs_Var, args: &Vec<&mut pxs_Var>) -> Result<pxs_Var, anyhow::Error> {
+    fn var_call(method: &pxs_Var, args: &mut pxs_VarList) -> Result<pxs_Var, anyhow::Error> {
         // Make sure it's a function!
         if !method.is_function() {
             return Err(anyhow!("Expected Function, found: {:#?}", method.tag));
@@ -414,10 +414,10 @@ impl ObjectMethods for PythonScripting {
         }
 
         // Add args
-        add_args(args);
+        add_args(&args.vars);
 
         // Call it via vectrocall
-        let ok = unsafe { pocketpy::py_vectorcall(args.len() as u16, 0) };
+        let ok = unsafe { pocketpy::py_vectorcall(args.vars.len() as u16, 0) };
         if !ok {
             return Ok(pxs_Var::new_null());
         }

@@ -257,23 +257,24 @@ typedef struct pxs_Var {
 /**
  * Function reference used in C.
  *
- * argc: i32, The number of args.
- * argc: *const *mut Var, a C Array of args.
+ * args: *mut pxs_Var, A list of vars.
  * opaque: *mut c_void, opaque user data.
  *
  * Func handles it's own memory, so no need to free the *mut Var returned or the argvs.
  *
  * But if you use any Vars within the function, you will have to free them before the function returns.
  */
-typedef struct pxs_Var *(*pxs_Func)(uintptr_t argc, struct pxs_Var **argv, void *opaque);
+typedef struct pxs_Var *(*pxs_Func)(struct pxs_Var *args, void *opaque);
 
 typedef void *pxs_Opaque;
 
 typedef void (*FreeMethod)(void *ptr);
 
-typedef uintptr_t pxs_Argc;
-
-typedef struct pxs_Var **pxs_Argv;
+/**
+ * Type Helper for a pxs_Var
+ * Use this instead of writing out pxs_Var*
+ */
+typedef struct pxs_Var *pxs_VarT;
 
 /**
  * Function Type for Loading a file.
@@ -327,35 +328,32 @@ void pxs_finalize(void);
  *
  * The result needs to be freed by calling `pxs_free_str`
  */
-char *pxs_exec_lua(const char *code, const char *file_name);
+char *pxs_execlua(const char *code, const char *file_name);
 
 /**
  * Execute some Python code. Will return a String, an empty string means that the code executed successfully.
  *
  * The result needs to be freed by calling `pxs_free_str`
  */
-char *pxs_exec_python(const char *code,
-                      const char *file_name);
+char *pxs_execpython(const char *code,
+                     const char *file_name);
 
 /**
  * Free the string created by the pixelscript library
  */
-void pxs_free_str(char *string);
+void pxs_freestr(char *string);
 
 /**
  * Create a new pixelscript Module.
  */
-struct pxs_Module *pxs_new_module(const char *name);
+struct pxs_Module *pxs_newmod(const char *name);
 
 /**
  * Add a callback to a module.
  *
  * Pass in the modules pointer and callback paramaters.
  */
-void pxs_add_callback(struct pxs_Module *module_ptr,
-                      const char *name,
-                      pxs_Func func,
-                      pxs_Opaque opaque);
+void pxs_addfunc(struct pxs_Module *module_ptr, const char *name, pxs_Func func, pxs_Opaque opaque);
 
 /**
  * Add a Varible to a module.
@@ -364,26 +362,26 @@ void pxs_add_callback(struct pxs_Module *module_ptr,
  *
  * Variable ownership is transfered.
  */
-void pxs_add_variable(struct pxs_Module *module_ptr, const char *name, struct pxs_Var *variable);
+void pxs_addvar(struct pxs_Module *module_ptr, const char *name, struct pxs_Var *variable);
 
 /**
  * Add a Module to a Module
  *
  * This transfers ownership.
  */
-void pxs_add_submodule(struct pxs_Module *parent_ptr, struct pxs_Module *child_ptr);
+void pxs_add_submod(struct pxs_Module *parent_ptr, struct pxs_Module *child_ptr);
 
 /**
  * Add the module finally to the runtime.
  *
  * After this you can forget about the ptr since PM handles it.
  */
-void pxs_add_module(struct pxs_Module *module_ptr);
+void pxs_addmod(struct pxs_Module *module_ptr);
 
 /**
  * Optionally free a module if you changed your mind.
  */
-void pxs_free_module(struct pxs_Module *module_ptr);
+void pxs_freemod(struct pxs_Module *module_ptr);
 
 /**
  * Create a new object.
@@ -392,17 +390,17 @@ void pxs_free_module(struct pxs_Module *module_ptr);
  *
  * This must be wrapped in a `pxs_var_object` before use within a callback. If setting to a variable, this is done automatically for you.
  */
-struct pxs_PixelObject *pxs_new_object(pxs_Opaque ptr,
-                                       FreeMethod free_method,
-                                       const char *type_name);
+struct pxs_PixelObject *pxs_newobject(pxs_Opaque ptr,
+                                      FreeMethod free_method,
+                                      const char *type_name);
 
 /**
  * Add a callback to a object.
  */
-void pxs_object_add_callback(struct pxs_PixelObject *object_ptr,
-                             const char *name,
-                             pxs_Func callback,
-                             pxs_Opaque opaque);
+void pxs_object_addfunc(struct pxs_PixelObject *object_ptr,
+                        const char *name,
+                        pxs_Func callback,
+                        pxs_Opaque opaque);
 
 /**
  * Add a object to a Module.
@@ -432,20 +430,20 @@ void pxs_object_add_callback(struct pxs_PixelObject *object_ptr,
  * let p = new Person("Jordan", 23);
  * ```
  */
-void pxs_add_object(struct pxs_Module *module_ptr,
-                    const char *name,
-                    pxs_Func object_constructor,
-                    pxs_Opaque opaque);
+void pxs_addobject(struct pxs_Module *module_ptr,
+                   const char *name,
+                   pxs_Func object_constructor,
+                   pxs_Opaque opaque);
 
 /**
  * Make a new Var string.
  */
-struct pxs_Var *pxs_var_newstring(const char *str);
+struct pxs_Var *pxs_newstring(const char *str);
 
 /**
  * Make a new Null var.
  */
-struct pxs_Var *pxs_var_newnull(void);
+struct pxs_Var *pxs_newnull(void);
 
 /**
  * Make a new HostObject var.
@@ -454,43 +452,42 @@ struct pxs_Var *pxs_var_newnull(void);
  *
  * Transfers ownership
  */
-struct pxs_Var *pxs_var_newhost_object(struct pxs_PixelObject *pixel_object);
+struct pxs_Var *pxs_newhost(struct pxs_PixelObject *pixel_object);
 
 /**
  * Create a new variable int. (i64)
  */
-struct pxs_Var *pxs_var_newint(int64_t val);
+struct pxs_Var *pxs_newint(int64_t val);
 
 /**
  * Create a new variable uint. (u64)
  */
-struct pxs_Var *pxs_var_newuint(uint64_t val);
+struct pxs_Var *pxs_newuint(uint64_t val);
 
 /**
  * Create a new variable bool.
  */
-struct pxs_Var *pxs_var_newbool(bool val);
+struct pxs_Var *pxs_newbool(bool val);
 
 /**
  * Create a new variable float. (f64)
  */
-struct pxs_Var *pxs_var_newfloat(double val);
+struct pxs_Var *pxs_newfloat(double val);
 
 /**
  * Call a function on a object, and use a Enum for runtime rather than a var.
  *
  * var is self.
  */
-struct pxs_Var *pxs_object_call_rt(enum PixelScriptRuntime runtime,
-                                   struct pxs_Var *var,
-                                   const char *method,
-                                   pxs_Argc argc,
-                                   pxs_Argv argv);
+struct pxs_Var *pxs_object_callrt(enum PixelScriptRuntime runtime,
+                                  struct pxs_Var *var,
+                                  const char *method,
+                                  struct pxs_Var *args);
 
 /**
  * Object call.
  *
- * All memory is borrowed. But the var returned need to be freed on host side if not returned by a function.
+ * All memory is borrowed except for args. But the var returned need to be freed on host side if not returned by a function.
  *
  * You can get the runtime from the first Var in any callback.
  *
@@ -501,31 +498,30 @@ struct pxs_Var *pxs_object_call_rt(enum PixelScriptRuntime runtime,
  *     Var name = pxs_object_call()
  * ```
  */
-struct pxs_Var *pxs_object_call(struct pxs_Var *runtime,
-                                struct pxs_Var *var,
-                                const char *method,
-                                pxs_Argc argc,
-                                pxs_Argv argv);
+pxs_VarT pxs_objectcall(struct pxs_Var *runtime,
+                        struct pxs_Var *var,
+                        const char *method,
+                        struct pxs_Var *args);
 
 /**
  * Get a int (i64) from a var.
  */
-int64_t pxs_var_get_int(struct pxs_Var *var);
+int64_t pxs_getint(struct pxs_Var *var);
 
 /**
  * Get a uint (u64)
  */
-uint64_t pxs_var_get_uint(struct pxs_Var *var);
+uint64_t pxs_getuint(struct pxs_Var *var);
 
 /**
  * Get a float (f64)
  */
-double pxs_var_get_float(struct pxs_Var *var);
+double pxs_getfloat(struct pxs_Var *var);
 
 /**
  * Get a Bool
  */
-bool pxs_var_get_bool(struct pxs_Var *var);
+bool pxs_getbool(struct pxs_Var *var);
 
 /**
  * Get a String
@@ -534,86 +530,85 @@ bool pxs_var_get_bool(struct pxs_Var *var);
  *
  * You have to free this memory by calling `pxs_free_str`
  */
-char *pxs_var_get_string(struct pxs_Var *var);
+char *pxs_getstring(struct pxs_Var *var);
 
 /**
  * Get the pointer of the Host Object
  *
  * This is "potentially" dangerous.
  */
-pxs_Opaque pxs_var_get_host_object(struct pxs_Var *var);
+pxs_Opaque pxs_gethost(struct pxs_Var *var);
 
 /**
  * Get the IDX of the PixelObject
  */
-int32_t pxs_var_get_object_idx(struct pxs_Var *var);
+int32_t pxs_getobject(struct pxs_Var *var);
 
 /**
  * Check if a variable is of a type.
  */
-bool pxs_var_is(struct pxs_Var *var, pxs_VarType var_type);
+bool pxs_varis(struct pxs_Var *var, pxs_VarType var_type);
 
 /**
  * Set a function for reading a file.
  *
  * This is used to load files via import, require, etc
  */
-void pxs_set_file_reader(LoadFileFn func);
+void pxs_set_filereader(LoadFileFn func);
 
 /**
  * Set a function for writing a file.
  *
  * This is used to write files via pxs_json
  */
-void pxs_set_file_writer(WriteFileFn func);
+void pxs_set_filewriter(WriteFileFn func);
 
 /**
  * Set a function for reading a directory.
  *
  * This is used to read a dir.
  */
-void pxs_set_dir_reader(ReadDirFn func);
+void pxs_set_dirreader(ReadDirFn func);
 
 /**
  * Free a PixelScript var.
  *
  * You should only free results from `pxs_object_call`
  */
-void pxs_free_var(struct pxs_Var *var);
+void pxs_freevar(struct pxs_Var *var);
 
 /**
  * Tells PixelScript that we are in a new thread.
  */
-void pxs_start_thread(void);
+void pxs_startthread(void);
 
 /**
  * Tells PixelScript that we just stopped the most recent thread.
  */
-void pxs_stop_thread(void);
+void pxs_stopthread(void);
+
+/**
+ * Call a method within a specifed runtime.
+ *
+ * Runtime is a `pxs_Var`.
+ *
+ * Transfers ownership of args.
+ */
+struct pxs_Var *pxs_call(struct pxs_Var *runtime, const char *method, struct pxs_Var *args);
 
 /**
  * Call a ToString method on this Var. If already a string, it won't call it.
  *
  * Host must free this memory with `pxs_free_var`
  */
-struct pxs_Var *pxs_var_tostring(struct pxs_Var *runtime, struct pxs_Var *var);
-
-/**
- * Call a method within a specifed runtime.
- *
- * Runtime is a `pxs_Var`
- */
-struct pxs_Var *pxs_call_method(struct pxs_Var *runtime,
-                                const char *method,
-                                pxs_Argc argc,
-                                pxs_Argv argv);
+struct pxs_Var *pxs_tostring(struct pxs_Var *runtime, struct pxs_Var *var);
 
 /**
  * Create a new pxs_VarList.
  *
  * This does not take any arguments. To add to a list, you must call `pxs_var_list_add(ptr, item)`
  */
-struct pxs_Var *pxs_var_newlist(void);
+struct pxs_Var *pxs_newlist(void);
 
 /**
  * Add a item to a pxs_VarList.
@@ -624,8 +619,8 @@ struct pxs_Var *pxs_var_newlist(void);
  *
  * Will return the index added at.
  */
-int32_t pxs_var_list_add(struct pxs_Var *list,
-                         struct pxs_Var *item);
+int32_t pxs_listadd(struct pxs_Var *list,
+                    struct pxs_Var *item);
 
 /**
  * Get a item from a pxs_VarList.
@@ -634,8 +629,8 @@ int32_t pxs_var_list_add(struct pxs_Var *list,
  *
  * This will return a cloned variable, you must free it once done.
  */
-struct pxs_Var *pxs_var_list_get(struct pxs_Var *list,
-                                 int32_t index);
+struct pxs_Var *pxs_listget(struct pxs_Var *list,
+                            int32_t index);
 
 /**
  * Set a item at a specific index in a pxs_VarList.
@@ -646,32 +641,33 @@ struct pxs_Var *pxs_var_list_get(struct pxs_Var *list,
  *
  * This will return a boolean for success = true, or failure = false.
  */
-bool pxs_var_list_set(struct pxs_Var *list,
-                      int32_t index,
-                      struct pxs_Var *item);
+bool pxs_listset(struct pxs_Var *list,
+                 int32_t index,
+                 struct pxs_Var *item);
 
 /**
  * Get length of a pxs_VarList.
  *
  * Expects a pointer to a pxs_VarList
  */
-int32_t pxs_var_list_getlen(struct pxs_Var *list);
+int32_t pxs_listlen(struct pxs_Var *list);
 
 /**
  * Call a `pxs_Var`s function.
  *
- * Expects runtime var, var function, argc, argv.
+ * Expects runtime var, var function, and args that is a List.
+ *
+ * Transfers ownership of args.
  */
-struct pxs_Var *pxs_var_call(struct pxs_Var *runtime,
-                             struct pxs_Var *var_func,
-                             pxs_Argc argc,
-                             pxs_Argv argv);
+struct pxs_Var *pxs_varcall(struct pxs_Var *runtime,
+                            struct pxs_Var *var_func,
+                            struct pxs_Var *args);
 
 /**
  * Copy the pxs_Var.
  *
  * Memory is handled by caller
  */
-struct pxs_Var *pxs_var_newcopy(struct pxs_Var *item);
+struct pxs_Var *pxs_newcopy(struct pxs_Var *item);
 
 #endif  /* PIXEL_SCRIPT_H */

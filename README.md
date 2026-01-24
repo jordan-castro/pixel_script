@@ -30,9 +30,9 @@ For rust based use I will be adding a Rust wrapper, which is funny because this 
 | `lua`            | Lua               | mlua                  | Fast, battle-tested, v5.4       |
 | `python`         | Python            | pocketpy              | Requires MSVC on Windows        |
 | `js`             | JavaScript        | rquickjs              | Quickjs, C library              |
-| `easyjs`         | EasyJS            | Custom                | Requires a JS feature           |
+| `easyjs`         | EasyJS            | easyjsc               | Requires a JS feature           |
+| `php`            | PHP               | PH7                   | Only supports v5.3 and the engine is not maintained anymore |
 | `rustpython`     | Python (CPython compatible)    | rustpython              | Larger binary, Full Python library support, currently leaking memory.                  |
-| `luajit`        | LuaJit            | mlua                  | does not work on ios, v5.4      |
 <!-- | `js-quick`       | JavaScript        | rquickjs              | QuickJS, more complete          | -->
 
 When including `easyjs` make sure to also include a JavaScript feature otherwise it will not work.
@@ -184,19 +184,22 @@ void destroy_person(Person *p) {
 
 // ========================== C Binding (END) ==========================
 
-pxs_Var* ps_set_name(struct pxs_VarList* args, void *opaque) {
-    pxs_Var* runtime = pxs_var_list_get(args, 0);
-    pxs_Var* self = pxs_var_list_get(args, 1);
-    pxs_Var* name - pxs_var_list_get(args, 2);
+pxs_Var* ps_set_name(pxs_VarList* args, void *opaque) {
+    int argc = pxs_listlen(args);
+    pxs_Var* runtime = pxs_listget(args, 0);
+    pxs_Var* self = pxs_listget(args, 1);
+    pxs_Var* name - pxs_listget(args, 2);
 
-    Person* p = pxs_var_get_host_object(self);
-    char* new_name = pxs_var_get_string(name);
+    pxs_add(args, pxs_newint(0))
+
+    Person* p = pxs_gethost(self);
+    char* new_name = pxs_getstring(name);
 
     set_name(p, new_name);
 
-    pxs_free_str(new_name);
+    pxs_freestr(new_name);
 
-    return pxs_var_newnull();
+    return pxs_newnull();
 }
 
 Var* ps_get_name(uintptr_t argc, struct Var **argv, void *opaque) {

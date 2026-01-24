@@ -511,14 +511,21 @@ impl Clone for pxs_Var {
     }
 }
 
+/// Methods for interacting with objects and callbacks from the runtime.
 pub trait ObjectMethods {
     /// Call a method on a object.
-    fn object_call(var: &pxs_Var, method: &str, args: &Vec<&mut pxs_Var>)
+    fn object_call(var: &pxs_Var, method: &str, args: &mut pxs_VarList)
     -> Result<pxs_Var, Error>;
 
     /// Call a method and pass in args
-    fn call_method(method: &str, args: &Vec<&mut pxs_Var>) -> Result<pxs_Var, Error>;
+    fn call_method(method: &str, args: &mut pxs_VarList) -> Result<pxs_Var, Error>;
 
     /// Call a pxs_Var function.
-    fn var_call(method: &pxs_Var, args: &Vec<&mut pxs_Var>) -> Result<pxs_Var, Error>;
+    fn var_call(method: &pxs_Var, args: &mut pxs_VarList) -> Result<pxs_Var, Error>;
 }
+
+
+/// Type Helper for a pxs_Var
+/// Use this instead of writing out pxs_Var*
+#[allow(non_camel_case_types)]
+pub type pxs_VarT = *mut pxs_Var;

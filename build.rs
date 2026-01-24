@@ -16,6 +16,54 @@ let crate_dir = env::var("CARGO_MANIFEST_DIR").unwrap();
         .write_to_file(output_file);
 }
 
+/// Build PH7 library
+#[cfg(feature = "php")]
+fn build_ph7() {
+    let mut build = cc::Build::new();
+
+    // Add source
+    build.file("libs/ph7/ph7.c");
+    // Add header location
+    build.include("libs/ph7");
+
+    let builder = std::env::var("CARGO_CFG_TARGET_ENV").unwrap_or_default();
+
+    if builder == "msvc" {
+        build.flag("/Ox");
+        build.flag("/fp:fast");
+    } else {
+        // GCC/Clang
+        build.flag("-Wunused");
+        build.flag("-Ofast");
+    }
+
+    build.compile("ph7");
+}
+
+/// Build bindings for ph7
+#[cfg(feature = "php")]
+fn build_ph7_bindings() {
+    let mut builder = bindgen::Builder::default()
+        .header("libs/ph7/ph7.h")
+        .clang_arg("-libs/ph7")
+        .default_enum_style(bindgen::EnumVariation::Rust { non_exhaustive: false })
+        .size_t_is_usize(true)
+        .parse_callbacks(Box::new(bindgen::CargoCallbacks::new()));
+
+    // add GNU libs
+    for arg in find_gnu_include_path() {
+        builder = builder.clang_arg(arg);
+    }
+
+    let bindings = builder.generate().expect("Unable to build Pocketpy rust bindings");
+ 
+    // Write bindings
+    let out_path = PathBuf::from(env::var("OUT_DIR").unwrap());
+    bindings
+        .write_to_file(out_path.join("ph7_bindings.rs"))
+        .expect("Couldn't write ph7 bindings!");    
+}
+
 /// Build PocketPy library
 #[cfg(feature = "python")]
 fn build_pocketpy() {
@@ -137,11 +185,21 @@ fn main() {
     println!("cargo:rerun-if-changed=src/lib.rs");
     println!("cargo:rerun-if-changed=cbindgen.toml");
 
+    // Compile pocketpy
     #[cfg(feature = "python")] 
     {
         build_pocketpy();
         build_pocketpy_bindings();
         println!("cargo:rerun-if-changed=libs/pocketpy/pocketpy.c");
         println!("cargo:rerun-if-changed=libs/pocketpy/pocketpy.h");
+    }
+
+    // Compile PH7
+    #[cfg(feature = "php")]
+    {
+        build_ph7();
+        build_ph7_bindings();
+        println!("carg:rerun-if-changed=libs/ph7/ph7.c");
+        println!("carg:rerun-if-changed=libs/ph7/ph7.h");
     }
 }

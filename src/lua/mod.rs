@@ -159,7 +159,7 @@ impl PixelScript for LuaScripting {
 }
 
 /// Convert args for ObjectMethods into LuaMutliValue
-fn args_to_lua(args: &Vec<&mut pxs_Var>) -> LuaMultiValue {
+fn args_to_lua(args: &Vec<pxs_Var>) -> LuaMultiValue {
     let mut lua_args = vec![];
     let state = get_lua_state();
     for arg in args.iter() {
@@ -174,7 +174,7 @@ impl ObjectMethods for LuaScripting {
     fn object_call(
         var: &crate::shared::var::pxs_Var,
         method: &str,
-        args: &Vec<&mut crate::shared::var::pxs_Var>,
+        args: &mut crate::shared::var::pxs_VarList,
     ) -> Result<crate::shared::var::pxs_Var, anyhow::Error> {
         // Get the lua table.
         let table = unsafe {
@@ -194,7 +194,7 @@ impl ObjectMethods for LuaScripting {
             }
         };
 
-        let lua_args = args_to_lua(args);
+        let lua_args = args_to_lua(&args.vars);
         let res = table
             .call_function(method, lua_args)
             .expect("Could not call function on Lua Table.");
@@ -207,10 +207,10 @@ impl ObjectMethods for LuaScripting {
 
     fn call_method(
         method: &str,
-        args: &Vec<&mut crate::shared::var::pxs_Var>,
+        args: &mut crate::shared::var::pxs_VarList,
     ) -> Result<crate::shared::var::pxs_Var, anyhow::Error> {
         // Get args as lua args
-        let lua_args = args_to_lua(args);
+        let lua_args = args_to_lua(&args.vars);
         let state = get_lua_state();
 
         let function: LuaFunction = state.engine.globals().get(method)?;
@@ -223,7 +223,7 @@ impl ObjectMethods for LuaScripting {
 
     fn var_call(
         method: &crate::shared::var::pxs_Var,
-        args: &Vec<&mut crate::shared::var::pxs_Var>,
+        args: &mut crate::shared::var::pxs_VarList,
     ) -> Result<crate::shared::var::pxs_Var, anyhow::Error> {
         if !method.is_function() {
             return Err(anyhow!("Expected a Function, found a: {:#?}", method.tag));
@@ -234,7 +234,7 @@ impl ObjectMethods for LuaScripting {
         let lua_function = fn_ptr as *const LuaFunction;
 
         // Convert  the methods into lua args
-        let lua_args = args_to_lua(args);
+        let lua_args = args_to_lua(&args.vars);
 
         // Call function
         let res: LuaValue = (unsafe { &*lua_function }).call(lua_args).expect("Could not call Lua method.");

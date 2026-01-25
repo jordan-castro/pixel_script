@@ -63,38 +63,38 @@ mod tests {
         let _ = unsafe { TodoList::from_borrow(ptr as *mut TodoList) };
     }
 
-    pub extern "C" fn new_todolist(args: pxs_VarT, _opaque: pxs_Opaque) -> pxs_VarT {
-        unsafe {
-            // Expect a list
-            let list = pxs_listget(args, 1);
-            // Add the iteam
-            let mut strings = vec![];
-            for i in 0..pxs_listlen(list) {
-                let string = pxs_getstring(pxs_listget(list, i));
-                let rstring = own_string!(string);
+    // pub extern "C" fn new_todolist(args: pxs_VarT, _opaque: pxs_Opaque) -> pxs_VarT {
+    //     unsafe {
+    //         // Expect a list
+    //         let list = pxs_listget(args, 1);
+    //         // Add the iteam
+    //         let mut strings = vec![];
+    //         for i in 0..pxs_listlen(list) {
+    //             let string = pxs_getstring(pxs_listget(list, i));
+    //             let rstring = own_string!(string);
 
-                strings.push(rstring);
-            }
+    //             strings.push(rstring);
+    //         }
 
-            // Now add to new object
-            let todolist = TodoList::new(strings);
+    //         // Now add to new object
+    //         let todolist = TodoList::new(strings);
 
-            let ptr = todolist.into_raw();
-            let typename = create_raw_string!("TodoList");
-            let object = pxs_newobject(ptr as *mut c_void, free_todolist, typename);
-            free_raw_string!(typename);
+    //         let ptr = todolist.into_raw();
+    //         let typename = create_raw_string!("TodoList");
+    //         let object = pxs_newobject(ptr as *mut c_void, free_todolist, typename);
+    //         free_raw_string!(typename);
 
-            let func_name = create_raw_string!("get_item");
-            pxs_object_addfunc(object, func_name, get_item, ptr::null_mut());
-            free_raw_string!(func_name);
+    //         let func_name = create_raw_string!("get_item");
+    //         pxs_object_addfunc(object, func_name, get_item, ptr::null_mut());
+    //         free_raw_string!(func_name);
 
-            let func_name = create_raw_string!("add_item");
-            pxs_object_addfunc(object, func_name, add_item, ptr::null_mut());
-            free_raw_string!(func_name);
+    //         let func_name = create_raw_string!("add_item");
+    //         pxs_object_addfunc(object, func_name, add_item, ptr::null_mut());
+    //         free_raw_string!(func_name);
 
-            pxs_newnull()
-        }
-    }
+    //         pxs_newnull()
+    //     }
+    // }
 
     pub extern "C" fn get_item(args: *mut pxs_Var, _opaque: pxs_Opaque) -> pxs_VarT {
         unsafe {
@@ -377,6 +377,26 @@ mod tests {
         let math_module_name = create_raw_string!("math");
         let math_module = pxs_newmod(math_module_name);
 
+        // Add the todolist to the math module.
+        let todolist = TodoList::new(vec![]).into_raw();
+        let typename = create_raw_string!("TodoList");
+        let object = pxs_newobject(todolist as *mut c_void, free_todolist, typename);
+        free_raw_string!(typename);
+        // Add methods
+        let func_name = create_raw_string!("add_item");
+        pxs_object_addfunc(object, func_name, add_item, ptr::null_mut());
+        free_raw_string!(func_name);
+        let func_name = create_raw_string!("get_item");
+        free_raw_string!(func_name);
+        pxs_object_addfunc(object, func_name, get_item, ptr::null_mut());
+
+        println!("Before adding new variable");
+        // Set variable
+        let var_name2 = create_raw_string!("todo");
+        pxs_addvar(math_module, var_name2, pxs_newhost(object));
+        free_raw_string!(var_name2);
+
+        println!("After addiing");
         // Add a sub function
         let sub_name = create_raw_string!("sub");
         pxs_addfunc(math_module, sub_name, sub_wrapper, ptr::null_mut());
@@ -420,7 +440,7 @@ mod tests {
         pxs_set_filereader(file_loader);
         pxs_set_dirreader(dir_reader);
 
-        let runtime = pxs_Runtime::pxs_Python;
+        let runtime = pxs_Runtime::pxs_Lua;
         let mut lines = vec![];
         loop {
             let mut input = String::new(); // Create an empty, mutable String

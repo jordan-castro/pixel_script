@@ -89,6 +89,9 @@ pub(super) fn var_to_pocketpyref(out: pocketpy::py_Ref, var: &pxs_Var) {
                 if lang_ptr_is_null {
                     // Find current module
                     let cmod = pocketpy::py_inspect_currentmodule();
+                    if cmod.is_null() {
+                        println!("Cmod is null dude!");
+                    }
                     let c_name = create_raw_string!("__name__");
                     let pyname = pocketpy::py_name(c_name);
                     pocketpy::py_getattr(cmod, pyname);

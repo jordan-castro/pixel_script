@@ -182,7 +182,7 @@ int main() {
 
     // PHP!!!! 
     const char* php_script = "include('main');\n" // or require
-                            "main.print('Hello World from PHP!');";
+                            "\\main\\print('Hello World from PHP!');";
     char* error = pxs_execphp(php_script, "<ctest>");
     pxs_freestr(error);
 

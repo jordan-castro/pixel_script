@@ -328,6 +328,18 @@ impl pxs_Var {
         }
     }
 
+    /// Create a new pxs_VarList var with values.
+    pub fn new_list_with(vars: Vec<pxs_Var>) -> Self {
+        let mut list = pxs_VarList::new();
+        list.vars = vars;
+        pxs_Var {
+            tag: pxs_VarType::pxs_List,
+            value: pxs_VarValue {
+                list_val: list.into_raw()
+            }
+        }
+    }
+
     /// Create a new Function var.
     pub fn new_function(ptr: *mut c_void) -> Self {
         pxs_Var {

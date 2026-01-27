@@ -7,6 +7,7 @@
     - Optional
 
 - Make better use of anyhow
+- Make better use of '?'
 - C tests
     - Lua
     - Python
@@ -40,7 +41,6 @@
     - os
 
 ## Lua
-- Var List
 - Var Function
 
 ## Python (rustpython)

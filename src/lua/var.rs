@@ -27,9 +27,31 @@ pub(super) fn from_lua(value: LuaValue) -> Result<pxs_Var, anyhow::Error> {
         LuaValue::Integer(i) => Ok(pxs_Var::new_i64(i)),
         LuaValue::Number(n) => Ok(pxs_Var::new_f64(n)),
         LuaValue::String(s) => Ok(pxs_Var::new_string(s.to_string_lossy())),
+        LuaValue::Function(f) => {
+            // Get as pointer
+            let func = Box::into_raw(Box::new(f));
+            Ok(pxs_Var::new_function(func as *mut c_void))
+        }
         LuaValue::Table(t) => {
-            let obj = Box::into_raw(Box::new(t));
-            Ok(pxs_Var::new_object(obj as *mut c_void))
+            // Check if table is actually a list.
+            let t_length = t.len()?;
+
+            if t_length == 0 {
+                // Regular table
+                let obj = Box::into_raw(Box::new(t));
+                Ok(pxs_Var::new_object(obj as *mut c_void))
+            } else {
+                // It's a list.
+                let mut values = vec![];
+                for i in 0..t_length {
+                    let val = from_lua(t.get(i + 1)?)?;
+                    values.push(val);
+                }
+                // Convert into a pxs_Varlist
+                let list_var = pxs_Var::new_list_with(values);
+                // let values = t.
+                Ok(list_var)
+            }
         }
         _ => Ok(pxs_Var::new_null()),
     }
@@ -89,20 +111,48 @@ pub(super) fn into_lua(lua: &Lua, var: &pxs_Var) -> LuaResult<LuaValue> {
                 Ok(mlua::Value::Table(table))
             }
         }
-        pxs_VarType::pxs_List => todo!(),
-        pxs_VarType::pxs_Function => todo!(),
+        pxs_VarType::pxs_List => {
+            // Have to convert each item to a lua variable
+            let table = lua.create_table()?;
+
+            // Loop through items and BORROW them
+            for item in var.get_list().unwrap().vars.iter() {
+                // Add them to table
+                let lua_val = into_lua(lua, item)?;
+                table.push(lua_val)?;
+            }
+
+            Ok(mlua::Value::Table(table))
+        },
+        pxs_VarType::pxs_Function => {
+            //             unsafe {
+            //     // This MUST BE A TABLE!
+            //     let table_ptr = var.value.object_val as *const LuaTable;
+            //     if table_ptr.is_null() {
+            //         return Err(mlua::Error::RuntimeError(
+            //             "Null pointer in Object".to_string(),
+            //         ));
+            //     }
+
+            //     // Clone
+            //     let lua_table = (&*table_ptr).clone();
+
+            //     // WooHoo we are back into lua
+            //     Ok(mlua::Value::Table(lua_table))
+            // }
+            unsafe {
+                // This has got to be a function
+                let func_ptr = var.value.function_val as *const LuaFunction;
+                if func_ptr.is_null() {
+                    return Err(mlua::Error::RuntimeError("Null pointer in Function".to_string()));
+                }
+
+                // Clone the function
+                let lua_function = (&*func_ptr).clone();
+                // Do I need to clone here?
+                // Shouldn't I just return the value? Not sure...
+                Ok(mlua::Value::Function(lua_function))
+            }
+        },
     }
 }
-
-// /// Add a variable by name to __main__ in lua.
-// pub fn add_variable(context: &Lua, name: &str, variable: &Var) {
-//     context
-//         .globals()
-//         .set(
-//             name,
-//                 into_lua(context, variable)
-//                 .expect("Could not unwrap LUA vl from Var."),
-//         )
-//         .expect("Could not add variable to Lua global context.");
-//     // Listo!
-// }

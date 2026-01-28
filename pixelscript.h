@@ -70,6 +70,8 @@ typedef enum pxs_Runtime {
   pxs_PHP,
 } pxs_Runtime;
 
+typedef struct Option_DeleterFn Option_DeleterFn;
+
 /**
  * A Module is a C representation of data that needs to be (imported,required, etc)
  *
@@ -251,6 +253,10 @@ typedef struct pxs_Var {
    * A value as a union.
    */
   union pxs_VarValue value;
+  /**
+   * Optional delete method. This is used for Pointers in Objects, and Functions.
+   */
+  struct Option_DeleterFn deleter;
 } pxs_Var;
 
 /**
@@ -589,6 +595,13 @@ void pxs_startthread(void);
  * Tells PixelScript that we just stopped the most recent thread.
  */
 void pxs_stopthread(void);
+
+/**
+ * Clear the current threads state for all languages.
+ *
+ * Optionally, if you want to run the garbage collector.
+ */
+void pxs_clearstate(bool gc_collect);
 
 /**
  * Call a method within a specifed runtime.

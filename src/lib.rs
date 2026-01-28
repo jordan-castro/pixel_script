@@ -774,6 +774,7 @@ pub extern "C" fn pxs_freevar(var: *mut pxs_Var) {
 /// Tells PixelScript that we are in a new thread.
 #[unsafe(no_mangle)]
 pub extern "C" fn pxs_startthread() {
+    assert_initiated!();
     with_feature!("lua", {
         LuaScripting::start_thread();
     });
@@ -785,12 +786,27 @@ pub extern "C" fn pxs_startthread() {
 /// Tells PixelScript that we just stopped the most recent thread.
 #[unsafe(no_mangle)]
 pub extern "C" fn pxs_stopthread() {
+    assert_initiated!();
     with_feature!("lua", {
         LuaScripting::stop_thread();
     });
     with_feature!("python", {
         PythonScripting::stop_thread();
     });
+}
+
+/// Clear the current threads state for all languages.
+/// 
+/// Optionally, if you want to run the garbage collector.
+#[unsafe(no_mangle)]
+pub extern "C" fn pxs_clearstate(gc_collect: bool) {
+    assert_initiated!();
+    with_feature!("lua", {
+        LuaScripting::clear_state(gc_collect);
+    });
+    with_feature!("python", {
+        PythonScripting::clear_state(gc_collect);
+    }); 
 }
 
 /// Call a method within a specifed runtime.

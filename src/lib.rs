@@ -541,14 +541,6 @@ pub extern "C" fn pxs_objectcall(
     }
     let list = args.get_list().unwrap();
 
-    // let argv_borrow: &[*mut pxs_Var] = unsafe { pxs_Var::slice_raw(argv, argc) };
-    // let mut owned_args: Vec<pxs_Var> = argv_borrow
-    //     .iter()
-    //     .filter(|ptr| !ptr.is_null())
-    //     .map(|&ptr| unsafe { (*ptr).clone() })
-    //     .collect();
-    // let args: Vec<&mut pxs_Var> = owned_args.iter_mut().collect();
-
     // Check that runtime is acually a int
     let runtime = runtime_borrow.get_i64();
     if runtime.is_err() {
@@ -562,13 +554,7 @@ pub extern "C" fn pxs_objectcall(
     let runtime = runtime.unwrap();
 
     // Ensure type
-    let tags = vec![
-        pxs_VarType::pxs_Object,
-        pxs_VarType::pxs_HostObject,
-        pxs_VarType::pxs_Int64,
-        pxs_VarType::pxs_UInt64,
-    ];
-    if !tags.contains(&var_borrow.tag) {
+    if !var_borrow.is_object() {
         return ptr::null_mut();
     }
 

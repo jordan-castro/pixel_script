@@ -442,4 +442,56 @@ impl ObjectMethods for PythonScripting {
 
         unsafe { Ok(pocketpyref_to_var(pocketpy::py_retval())) }
     }
+    
+    fn get(var: &pxs_Var, key: &str) -> Result<pxs_Var, anyhow::Error> {
+        unsafe {
+            if var.value.object_val.is_null() {
+                return Err(anyhow!("var.value.object_val is Null"));
+            }
+            // Deref
+            let object = var.value.object_val as pocketpy::py_Ref;
+            let raw_key = create_raw_string!(key);
+            let py_key = pocketpy::py_name(raw_key);
+            free_raw_string!(raw_key);
+            let res = pocketpy::py_getattr(object, py_key);
+
+            if !res {
+                return Err(anyhow!("var.{} could not be done.", key));
+            }
+
+            // Get value
+            Ok(
+                pocketpyref_to_var(pocketpy::py_retval())
+            )
+        }
+    }
+    
+    fn set(var: &pxs_Var, key: &str, value: &pxs_Var) -> Result<pxs_Var, anyhow::Error> {
+        unsafe {
+            if var.value.object_val.is_null() {
+                return Err(anyhow!("var.value.object_val is Null"));
+            }
+
+            // Deref
+            let object = var.value.object_val as pocketpy::py_Ref;
+            // Key
+            let raw_key = create_raw_string!(key);
+            let py_key = pocketpy::py_name(raw_key);
+            free_raw_string!(raw_key);
+            // Set
+            let tmp = pocketpy::py_pushtmp();
+            var_to_pocketpyref(tmp, value);
+            let res = pocketpy::py_setattr(object, py_key, tmp);
+
+            if !res {
+                return Err(anyhow!("var.{} = {:#?} could not be done.", key, value))
+            }
+
+            Ok(
+                pocketpyref_to_var(pocketpy::py_retval())
+            )
+        }
+    }
+
+    
 }

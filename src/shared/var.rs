@@ -434,6 +434,32 @@ impl pxs_Var {
         cloned
     }
 
+    /// Debug struct
+    unsafe fn dbg(&self) -> String {
+        unsafe {
+            match self.tag {
+                pxs_VarType::pxs_Int64 => self.value.i64_val.to_string(),
+                pxs_VarType::pxs_UInt64 => self.value.u64_val.to_string(),
+                pxs_VarType::pxs_String => borrow_string!(self.value.string_val).to_string(),
+                pxs_VarType::pxs_Bool => self.value.bool_val.to_string(),
+                pxs_VarType::pxs_Float64 => self.value.f64_val.to_string(),
+                pxs_VarType::pxs_Null => "Null".to_string(),
+                pxs_VarType::pxs_Object => "Object".to_string(),
+                pxs_VarType::pxs_HostObject => {
+                    let idx = self.get_object_ptr();
+                    let object = get_object(idx).unwrap();
+                    object.type_name.to_string()
+                },
+                pxs_VarType::pxs_List => {
+                    let list = self.get_list().unwrap();
+                    let t = list.vars.iter().map(|v| v.dbg()).collect();
+                    t
+                },
+                pxs_VarType::pxs_Function => "Function".to_string(),
+            }
+        }
+    }
+
     write_func!(
         (get_i64, i64_val, i64, pxs_VarType::pxs_Int64),
         (get_u64, u64_val, u64, pxs_VarType::pxs_UInt64),
@@ -560,6 +586,13 @@ impl Clone for pxs_Var {
     }
 }
 
+impl std::fmt::Debug for pxs_Var {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let debug_val: &dyn std::fmt::Debug = unsafe {&self.dbg()};
+        f.debug_struct("pxs_Var").field("tag", &self.tag).field("value", debug_val).finish()
+    }
+}
+
 /// Methods for interacting with objects and callbacks from the runtime.
 pub trait ObjectMethods {
     /// Call a method on a object.
@@ -570,6 +603,12 @@ pub trait ObjectMethods {
 
     /// Call a pxs_Var function.
     fn var_call(method: &pxs_Var, args: &mut pxs_VarList) -> Result<pxs_Var, Error>;
+
+    /// Getter
+    fn get(var: &pxs_Var, key: &str) -> Result<pxs_Var, Error>;
+
+    /// Setter
+    fn set(var: &pxs_Var, key: &str, value: &pxs_Var) -> Result<pxs_Var, Error>;
 }
 
 /// Type Helper for a pxs_Var

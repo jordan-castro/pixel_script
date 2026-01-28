@@ -18,7 +18,7 @@ use std::{cell::RefCell, collections::HashMap};
 
 use crate::{
     lua::var::{from_lua, into_lua},
-    shared::{PixelScript, object::get_object, read_file, var::{ObjectMethods, pxs_Var}},
+    shared::{PixelScript, read_file, var::{ObjectMethods, pxs_Var}},
 };
 
 thread_local! {
@@ -191,20 +191,9 @@ impl ObjectMethods for LuaScripting {
     ) -> Result<crate::shared::var::pxs_Var, anyhow::Error> {
         // Get the lua table.
         let table = unsafe {
-            if var.is_host_object() {
-                // This is from the PTR!
-                let pixel_object =
-                    get_object(var.value.host_object_val).expect("No HostObject found.");
-                let lang_ptr = pixel_object.lang_ptr.lock().unwrap();
-                // Get as table.
-                let table_ptr = *lang_ptr as *const LuaTable;
-                // Return table
-                (&*table_ptr).clone()
-            } else {
-                // Just grab it from the ptr itself
-                let table_ptr = var.value.object_val as *const LuaTable;
-                (&*table_ptr).clone()
-            }
+            // Just grab it from the ptr itself
+            let table_ptr = var.value.object_val as *const LuaTable;
+            (&*table_ptr).clone()
         };
 
         let lua_args = args_to_lua(&args.vars);
@@ -255,4 +244,34 @@ impl ObjectMethods for LuaScripting {
         // Convert into pxs
         from_lua(res)
     }
+
+    fn get(var: &pxs_Var, key: &str) -> Result<pxs_Var, anyhow::Error> {
+        // Get object from lua
+        let table = unsafe {
+            // Just grab it from the ptr itself
+            let table_ptr = var.value.object_val as *const LuaTable;
+            (&*table_ptr).clone()
+        };
+
+        let value: LuaValue = table.raw_get(key)?;
+        
+        from_lua(value)
+    }
+    
+    fn set(var: &pxs_Var, key: &str, value: &pxs_Var) -> Result<pxs_Var, anyhow::Error> {
+        // Get object from lua
+        let table = unsafe {
+            // Just grab it from the ptr itself
+            let table_ptr = var.value.object_val as *const LuaTable;
+            (&*table_ptr).clone()
+        };
+
+        let state = get_lua_state();
+        let res = table.raw_set(key, into_lua(&state.engine, value)?);
+        Ok(match res {
+            Ok(_) => pxs_Var::new_bool(true),
+            Err(_) => pxs_Var::new_bool(false),
+        })
+    }
+
 }

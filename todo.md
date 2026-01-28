@@ -32,6 +32,7 @@
 
 ## Vars
 - Add exceptions
+- Add Map
 
 ## STD
 - Add std library via pixelscript runtime. These are optional and handled via features
@@ -41,7 +42,6 @@
     - os
 
 ## Lua
-- Fix leaks
 - Add Object.get
 - Add Object.set
 

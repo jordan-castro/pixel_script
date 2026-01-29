@@ -143,10 +143,8 @@ pub extern "C" fn pxs_finalize() {
 
     // Drop function lookup
     clear_function_lookup();
-    // get_function_lookup().function_hash.clear();
     // Drop object lookup
     clear_object_lookup();
-    // get_object_lookup().object_hash.clear();
 
     with_feature!("lua", {
         LuaScripting::stop();
@@ -787,6 +785,11 @@ pub extern "C" fn pxs_stopthread() {
 #[unsafe(no_mangle)]
 pub extern "C" fn pxs_clearstate(gc_collect: bool) {
     assert_initiated!();
+    // Drop function lookup
+    clear_function_lookup();
+    // Drop object lookup
+    clear_object_lookup();
+
     with_feature!("lua", {
         LuaScripting::clear_state(gc_collect);
     });
@@ -1214,3 +1217,4 @@ pub extern "C" fn pxs_objectset(runtime: pxs_VarT, obj: pxs_VarT, key: *const c_
         Err(_) => false,
     }
 }
+

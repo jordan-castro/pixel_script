@@ -227,7 +227,7 @@ typedef union pxs_VarValue {
  * - string
  * - boolean
  * - Objects
- * - HostObjects (C structs acting as pseudo-classes)
+ * - HostObjects (C structs acting as pseudo-classes) This in the Host can also be a Int or Uint.
  * - List
  * - Functions (First class functions)
  *
